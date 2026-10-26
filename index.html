@@ -200,7 +200,7 @@ tfoot td{font-weight:800;background:var(--bg)}
 
   <!-- QUESTIONS -->
   <section class="panel" id="v-sets" hidden>
-    <div class="row"><h2 style="flex:1">Séries de questions</h2><button class="btn" id="q-new">Nouvelle série</button></div>
+    <div class="row"><h2 style="flex:1">Séries de questions</h2><label class="btn ghost" for="q-import" style="display:inline-flex;align-items:center;position:relative;margin-right:8px">Importer des séries<input type="file" id="q-import" accept=".json,application/json" style="position:absolute;inset:0;opacity:0;width:100%"></label><button class="btn" id="q-new">Nouvelle série</button></div>
     <div class="setList" id="q-list"></div>
     <div id="q-edit" hidden style="display:flex;flex-direction:column;gap:12px"></div>
   </section>
@@ -764,6 +764,10 @@ function renderSets(){
 function openEdit(id){editing=id;draft=JSON.parse(JSON.stringify(S.sets[id]||{title:'Nouvelle série',order:Date.now(),questions:[{q:'',c:['','','',''],a:0,e:''}]}));drawEdit()}
 function closeEdit(){editing=null;draft=null;var e=$('#q-edit');e.hidden=true;e.innerHTML=''}
 $('#q-new').onclick=function(){openEdit(uid('set-'))};
+$('#q-import').onchange=function(){var f=this.files&&this.files[0];this.value='';if(!f)return;if(mode==='remote'){toast('Importe les séries depuis l\'ordinateur.');return}
+  var r=new FileReader();r.onload=function(){try{var v=JSON.parse(r.result);if(!v||typeof v!=='object'||!v.sets)throw 0;var n=0;
+    for(var k in v.sets){var st=v.sets[k];if(!st||!Array.isArray(st.questions))continue;S.sets[k]=st;writeDoc('sets/'+k,st,false);n++}
+    if(!n)throw 0;lsPut();broadcast(true);rerender();toast(n+' série'+(n>1?'s importées':' importée'))}catch(e){toast('Ce fichier ne contient pas de séries de questions.')}};r.readAsText(f)};
 function drawEdit(){
   var e=$('#q-edit');e.hidden=false;
   var h='<div class="row"><label for="qe-title">Titre</label><input id="qe-title" style="flex:1;min-width:200px" value="'+esc(draft.title)+'"></div>';
