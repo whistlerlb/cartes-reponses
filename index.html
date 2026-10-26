@@ -155,7 +155,7 @@ tfoot td{font-weight:800;background:var(--bg)}
 <body>
 <div class="wrap">
   <header>
-    <h1>Cartes-réponses</h1><span class="muted" style="font-size:12px">version 7</span>
+    <h1>Cartes-réponses</h1><span class="muted" style="font-size:12px">version 8</span>
     <span class="link" id="link"></span>
     <nav class="tabs" role="tablist">
       <button role="tab" data-v="proj" aria-selected="true">Projeter</button>
@@ -211,7 +211,7 @@ tfoot td{font-weight:800;background:var(--bg)}
     <p class="note" style="margin:0">Seuls le nom de la classe et le nombre d'élèves sont enregistrés, aucun prénom. Distribue les cartes 1, 2, 3… et garde de ton côté la liste « numéro de carte → élève » : chaque élève reprend toujours la même carte.</p>
     <div class="setList" id="c-list"></div>
     <h3>Fichier de données</h3>
-    <p class="note" style="margin:0">Tes classes, séries et résultats sont enregistrés dans un fichier à toi (dans ton OneDrive ou sur une clé USB, par exemple), automatiquement à chaque changement. Au cours suivant, même sur un autre ordinateur, tu rouvres ce fichier et tout est là.</p>
+    <p class="note" style="margin:0"><b>Ton téléphone garde une copie complète</b> de tes classes, séries et résultats : dès qu'il se relie à un ordinateur, même un autre PC, tout est échangé automatiquement dans les deux sens. En plus, tu peux enregistrer les données dans un fichier à toi (dans ton OneDrive ou sur une clé USB, par exemple), automatiquement à chaque changement. Au cours suivant, même sur un autre ordinateur, tu rouvres ce fichier et tout est là.</p>
     <div id="fileBox" class="row"></div>
     <details><summary class="muted" style="cursor:pointer;font-weight:800;font-size:14px">Autres options</summary>
     <div class="row" style="margin-top:10px"><button class="btn ghost" id="c-backup">Télécharger une copie</button><label class="btn ghost" for="c-restore" style="display:inline-flex;align-items:center;position:relative">Importer une copie<input type="file" id="c-restore" accept=".json,application/json" style="position:absolute;inset:0;opacity:0;width:100%"></label></div></details>
@@ -228,7 +228,6 @@ tfoot td{font-weight:800;background:var(--bg)}
     <div id="r-confirm" class="note" hidden></div>
     <div id="r-sum" class="muted"></div>
     <div class="tbl"><table id="r-tbl"></table></div>
-    <p class="muted" id="r-remote" hidden style="margin:0">Sur le téléphone relié, seule la séance en cours s'affiche : l'historique complet est sur l'ordinateur.</p>
     <div class="row"><h3 style="flex:1">Bilan de la classe, toutes séances</h3><button class="btn solid" id="r-csvall">Exporter tous les résultats de la classe</button></div>
     <p class="muted" style="margin:0;font-size:14px">Les résultats sont enregistrés automatiquement sur cet ordinateur. L'export crée un fichier pour Excel, une ligne par carte et une colonne par séance, avec une colonne « Prénom » vide à compléter chez toi.</p>
     <div class="tbl"><table id="r-all"></table></div>
@@ -465,15 +464,17 @@ var S={classe:{name:'',students:{}},sets:{},sessions:{},live:{}};
 function clone(o){return o==null?o:JSON.parse(JSON.stringify(o))}
 function lsGet(){try{var v=localStorage.getItem('cr-data');return v?JSON.parse(v):null}catch(e){return null}}
 var lsWarned=false;
-function lsPut(){if(mode==='remote')return;scheduleFileSave();try{localStorage.setItem('cr-data',JSON.stringify(S))}catch(e){if(!lsWarned){lsWarned=true;toast('Mémoire du navigateur pleine : télécharge une sauvegarde.')}}}
+function phonePut(){try{localStorage.setItem('cr-phone-data',JSON.stringify(dataForFile()))}catch(e){}}
+function lsPut(){if(mode==='remote'){phonePut();return}scheduleFileSave();try{localStorage.setItem('cr-data',JSON.stringify(S))}catch(e){if(!lsWarned){lsWarned=true;toast('Mémoire du navigateur pleine : télécharge une sauvegarde.')}}}
 function lsGetK(k){try{return localStorage.getItem(k)}catch(e){return null}}
 function lsSetK(k,v){try{if(v==null)localStorage.removeItem(k);else localStorage.setItem(k,v)}catch(e){}}
 function render(){renderProj();renderScan();renderSets();renderClass();renderRes();renderLink();try{renderFile()}catch(e){}}
 var rq=0;function rerender(){if(rq)return;rq=requestAnimationFrame(function(){rq=0;render()})}
+function delMark(kind,id){S.deleted=S.deleted||{};S.deleted[kind]=S.deleted[kind]||{};S.deleted[kind][id]=1}
 function applyWrite(path,data){var p=path.split('/');
-  if(path==='config/classes'&&data)S.classes=data;else if(p[0]==='config'&&data)S.classe=data;else if(p[0]==='live')S.live=data||{};
-  else if((p[0]==='sets'||p[0]==='sessions')&&p[1]){if(data==null)delete S[p[0]][p[1]];else S[p[0]][p[1]]=data}}
-function writeDoc(path,data){data=clone(data);applyWrite(path,data);if(mode==='remote')rsend({t:'w',path:path,data:data});else{lsPut();broadcast(path.indexOf('sets/')===0)}rerender();return Promise.resolve()}
+  if(path==='config/classes'&&data){var old=(S.classes&&S.classes.list)||{};for(var k in old)if(!data.list||!data.list[k])delMark('classes',k);S.classes=data}else if(p[0]==='config'&&data)S.classe=data;else if(p[0]==='live')S.live=data||{};
+  else if((p[0]==='sets'||p[0]==='sessions')&&p[1]){if(data==null){delete S[p[0]][p[1]];delMark(p[0],p[1])}else S[p[0]][p[1]]=data}}
+function writeDoc(path,data){data=clone(data);applyWrite(path,data);if(mode==='remote'){rsend({t:'w',path:path,data:data});lsPut()}else{lsPut();broadcast(path.indexOf('sets/')===0)}rerender();return Promise.resolve()}
 function delDoc(path){return writeDoc(path,null)}
 function mergeAns(id,key,map){var s=S.sessions[id];if(!s)return;s.answers=s.answers||{};var cur=s.answers[key]=s.answers[key]||{};for(var n in map){if(map[n]==null)delete cur[n];else cur[n]=map[n]}}
 function deepMerge(a,b){for(var k in b){if(b[k]&&typeof b[k]==='object'&&!Array.isArray(b[k])){a[k]=deepMerge(a[k]&&typeof a[k]==='object'?a[k]:{},b[k])}else a[k]=b[k]}return a}
@@ -482,14 +483,15 @@ function deepMerge(a,b){for(var k in b){if(b[k]&&typeof b[k]==='object'&&!Array.
    Les messages passent par le service de mise en relation (connexion web sécurisée),
    découpés en petits morceaux : ça marche même sur un Wi-Fi qui isole les appareils. */
 var PREFIX='cartes-rep-wlb-',mode='host',peer=null,linkMsg='',myCode=null,remoteCode=null,peerReady=false;
-var clients={},remoteOk=false,lastState=0,helloT=null,outbox=[];
+var BOOT=Math.random().toString(36).slice(2),lastBoot=null,synced=false,clients={},remoteOk=false,lastState=0,helloT=null,outbox=[];
 function code4(){return String(Math.floor(1000+Math.random()*9000))}
-function snapshotFor(full){var L=S.live&&S.live.sessionId,ss={};if(L&&S.sessions[L])ss[L]=S.sessions[L];var o={classe:S.classe,classes:S.classes,live:S.live,sessions:ss};if(full)o.sets=S.sets;return o}
+function snapshotFor(full){var L=S.live&&S.live.sessionId,ss={};if(L&&S.sessions[L])ss[L]=S.sessions[L];var o={classe:S.classe,classes:S.classes,live:S.live,sessions:ss,deleted:S.deleted||{},boot:BOOT};if(full)o.sets=S.sets;return o}
 var CH=2800,rx={};
 function relaySend(dst,msg){if(!peer||!peer.socket||peer.destroyed||!peerReady)return false;
   var j=JSON.stringify(msg),id=Math.random().toString(36).slice(2,8),n=Math.ceil(j.length/CH)||1;
-  for(var i=0;i<n;i++){var part=n===1?{j:j}:{c:id,i:i,n:n,p:j.slice(i*CH,(i+1)*CH)};
-    try{peer.socket.send({type:'CANDIDATE',dst:dst,payload:{candidate:{candidate:'',sdpMid:'0',sdpMLineIndex:0},type:'data',connectionId:'dc_crrelay',cr:part}})}catch(e){return false}}
+  var pk=function(part){try{peer.socket.send({type:'CANDIDATE',dst:dst,payload:{candidate:{candidate:'',sdpMid:'0',sdpMLineIndex:0},type:'data',connectionId:'dc_crrelay',cr:part}});return true}catch(e){return false}};
+  if(n===1)return pk({j:j});
+  for(var i=0;i<n;i++)(function(i){var part={c:id,i:i,n:n,p:j.slice(i*CH,(i+1)*CH)};if(n<=6)pk(part);else setTimeout(function(){pk(part)},i*25)})(i);
   return true}
 function relayHook(onMsg){peer.socket.on('message',function(m){
   if(!m||!m.payload||!m.payload.cr||!m.src)return;
@@ -525,20 +527,25 @@ function onHostData(src,m){if(!m||typeof m!=='object')return;
   var isNew=!clients[src];clients[src]=Date.now();
   if(m.t==='w'&&typeof m.path==='string'){applyWrite(m.path,m.data);lsPut();broadcast(m.path.indexOf('sets/')===0);rerender()}
   else if(m.t==='ans'&&m.id&&m.key&&m.map){mergeAns(m.id,m.key,m.map);lsPut();broadcast();rerender()}
-  else if(m.t==='hello'){relaySend(src,{t:'state',S:snapshotFor(isNew||m.full)});if(isNew)rerender()}}
+  else if(m.t==='hello'){relaySend(src,{t:'state',S:snapshotFor(isNew||m.full)});if(isNew)rerender()}
+  else if(m.t==='sync'&&m.data){var before=Object.keys(S.sessions).length;mergeData(m.data);migrateClasses();lsPut();relaySend(src,{t:'syncAll',data:dataForFile()});broadcast(true);rerender();
+    var got=Object.keys(S.sessions).length-before;toast(got>0?got+' séance'+(got>1?'s':'')+' récupérée'+(got>1?'s':'')+' depuis le téléphone':'Téléphone synchronisé')}}
 function startRemote(code){
   code=String(code).replace(/\D/g,'');if(code.length!==4){toast('Le code a 4 chiffres.');return}
   if(code===myCode&&mode==='host'){toast('C\'est le code de cet appareil : tape-le sur le téléphone.');return}
   mode='remote';remoteCode=code;lsSetK('cr-remote',code);remoteOk=false;lastState=0;
   if(peer){try{peer.destroy()}catch(e){}}peer=null;peerReady=false;clients={};
-  S={classe:{name:'',students:{}},sets:{},sessions:{},live:{}};
+  S={classe:{name:'',students:{}},classes:{list:{},cur:null},sets:{},sessions:{},live:{},deleted:{}};
+  try{var pd=localStorage.getItem('cr-phone-data');if(pd)mergeData(JSON.parse(pd))}catch(e){}
   linkMsg='Étape 1/3 : chargement…';rerender();
   whenPeer(function(){
     linkMsg='Étape 2/3 : connexion au service de liaison…';rerender();
     peer=new Peer({debug:0});
     relayHook(function(src,m){if(src!==PREFIX+remoteCode||!m)return;
-      if(m.t==='state'&&m.S){S.classe=m.S.classe||{name:'',students:{}};if(m.S.classes)S.classes=m.S.classes;S.live=m.S.live||{};if(m.S.sets)S.sets=m.S.sets;for(var k in m.S.sessions)S.sessions[k]=m.S.sessions[k];
-        lastState=Date.now();if(!remoteOk){remoteOk=true;linkMsg='';var o=outbox;outbox=[];o.forEach(function(x){relaySend(PREFIX+remoteCode,x)})}rerender()}});
+      if(m.t==='syncAll'&&m.data){mergeData(m.data);phonePut();synced=true;rerender();return}
+      if(m.t==='state'&&m.S){S.classe=m.S.classe||{name:'',students:{}};mergeDeleted(m.S.deleted);mergeData({classes:m.S.classes,sets:m.S.sets||{},sessions:{}});S.live=m.S.live||{};for(var k in m.S.sessions)S.sessions[k]=m.S.sessions[k];purgeDeleted();phonePut();
+        lastState=Date.now();if(!remoteOk){remoteOk=true;linkMsg='';var o=outbox;outbox=[];o.forEach(function(x){relaySend(PREFIX+remoteCode,x)})}
+        if(m.S.boot&&m.S.boot!==lastBoot){lastBoot=m.S.boot;relaySend(PREFIX+remoteCode,{t:'sync',data:dataForFile()})}rerender()}});
     peer.on('open',function(){peerReady=true;hello(true)});
     peer.on('error',function(e){if(mode!=='remote')return;linkMsg='Liaison interrompue, reconnexion…';remoteOk=false;rerender()});
     peer.on('disconnected',function(){peerReady=false;remoteOk=false;rerender();setTimeout(function(){try{if(!peer.destroyed)peer.reconnect()}catch(x){}},2000)});
@@ -558,7 +565,7 @@ function renderLink(){var el=$('#link');
   else{var n=clientCount();el.className='link'+(n?' ok':'');
     el.innerHTML=peerReady?('Code téléphone <b>'+esc(myCode)+'</b>'+(n?' · '+n+' relié'+(n>1?'s':''):'')):esc(linkMsg||'Préparation de la liaison…')}
   var box=$('#s-conn');
-  if(mode==='remote')box.innerHTML='<div class="conn"><span class="muted">'+(remoteOk?'Relié à l\'ordinateur '+esc(remoteCode)+'.':esc(linkMsg))+'</span><button class="mini" id="s-unlink">Se déconnecter</button></div>';
+  if(mode==='remote')box.innerHTML='<div class="conn"><span class="muted">'+(remoteOk?'Relié à l\'ordinateur '+esc(remoteCode)+'. Copie complète sur ce téléphone : '+Object.keys(S.sessions).length+' séance'+(Object.keys(S.sessions).length>1?'s':'')+', '+Object.keys((S.classes&&S.classes.list)||{}).length+' classe(s).':esc(linkMsg))+'</span><button class="mini" id="s-unlink">Se déconnecter</button></div>';
   else box.innerHTML='<div class="note conn"><span style="flex:1;min-width:180px">Sur le téléphone : tape le code affiché sur l\'ordinateur du projecteur.</span><input id="s-code" inputmode="numeric" maxlength="4" placeholder="0000" aria-label="Code de l\'ordinateur"><button class="btn" id="s-link">Relier</button></div>';
   var b=$('#s-link');if(b)b.onclick=function(){startRemote($('#s-code').value)};
   var u=$('#s-unlink');if(u)u.onclick=stopRemote;
@@ -679,7 +686,7 @@ function renderScan(){
   if(cam.on&&cam.key!==qkey())camPause('Nouvelle question : touche « Scanner la question '+(lq.i+1)+' » quand les cartes sont levées.');
 }
 function saveAnswers(lq,map){var id=lq.L.id,key='q'+lq.i;mergeAns(id,key,map);
-  if(mode==='remote')rsend({t:'ans',id:id,key:key,map:map});else{lsPut();broadcast()}rerender()}
+  if(mode==='remote'){rsend({t:'ans',id:id,key:key,map:map});lsPut()}else{lsPut();broadcast()}rerender()}
 $('#s-prev').onclick=function(){go(-1)};$('#s-next').onclick=function(){go(1)};$('#s-reveal').onclick=rev;
 function status(h){$('#s-status').innerHTML=h||''}
 
@@ -810,7 +817,6 @@ function grid(x){var qs=x.s.questions||[],ans=x.s.answers||{},nums=named(x.s).sl
   qs.forEach(function(_,i){Object.keys(ans['q'+i]||{}).forEach(function(n){n=+n;if(nums.indexOf(n)<0)nums.push(n)})});nums.sort(function(a,b){return a-b});
   return {qs:qs,ans:ans,nums:nums}}
 function renderRes(){
-  $('#r-remote').hidden=mode!=='remote';
   var rcs=$('#r-class'),cls=classesSorted(),hasNone=Object.keys(S.sessions).some(function(k){return !S.sessions[k].classId});
   if(!resClassPicked){var all=Object.keys(S.sessions).map(function(k){return S.sessions[k]}).sort(function(a,b){return String(b.startedAt).localeCompare(String(a.startedAt))});
     var nk=all.length?(all[0].classId||'none'):'';if(nk)resClass=nk;else if(resClass===''){var cc=curClass();if(cc)resClass=cc.id}}
@@ -868,18 +874,22 @@ var FSA=!!(window.showOpenFilePicker&&window.showSaveFilePicker),fileH=null,file
 function idb(){return new Promise(function(res,rej){try{var r=indexedDB.open('cartes-reponses',1);r.onupgradeneeded=function(){r.result.createObjectStore('kv')};r.onsuccess=function(){res(r.result)};r.onerror=function(){rej(r.error)}}catch(e){rej(e)}})}
 function idbGet(k){return idb().then(function(d){return new Promise(function(res){var t=d.transaction('kv').objectStore('kv').get(k);t.onsuccess=function(){res(t.result)};t.onerror=function(){res(null)}})}).catch(function(){return null})}
 function idbSet(k,v){return idb().then(function(d){return new Promise(function(res){var t=d.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=res;t.onerror=res})}).catch(function(){})}
-function dataForFile(){return {app:'cartes-reponses',version:1,savedAt:new Date().toISOString(),classes:S.classes,sets:S.sets,sessions:S.sessions}}
+function dataForFile(){return {app:'cartes-reponses',version:1,savedAt:new Date().toISOString(),classes:S.classes,sets:S.sets,sessions:S.sessions,deleted:S.deleted||{}}}
 function scheduleFileSave(){if(!fileH)return;clearTimeout(fileTimer);fileTimer=setTimeout(writeFile,1000)}
 function writeFile(){if(!fileH)return Promise.resolve();var h=fileH;
   return h.createWritable().then(function(w){return w.write(JSON.stringify(dataForFile(),null,1)).then(function(){return w.close()})})
     .then(function(){fileSaved=Date.now();fileErr='';renderFile()})
     .catch(function(e){fileErr='Enregistrement impossible ('+(e&&e.name||e)+'). Rouvre le fichier.';if(e&&e.name==='NotAllowedError')fileH=null;renderFile()})}
 function sessAnsCount(x){var n=0,a=(x&&x.answers)||{};for(var k in a)n+=Object.keys(a[k]||{}).length;return n}
-function mergeData(v){if(!v||typeof v!=='object')return;
+function purgeDeleted(){var D=S.deleted||{},k;for(k in (D.sessions||{}))delete S.sessions[k];for(k in (D.sets||{}))delete S.sets[k];
+  if(S.classes&&S.classes.list){for(k in (D.classes||{}))delete S.classes.list[k];if(S.classes.cur&&!S.classes.list[S.classes.cur])S.classes.cur=null}}
+function mergeDeleted(d){if(!d)return;['sessions','sets','classes'].forEach(function(t){for(var k in (d[t]||{}))delMark(t,k)})}
+function mergeData(v){if(!v||typeof v!=='object')return;mergeDeleted(v.deleted);
   var c=v.classes&&v.classes.list?v.classes:{list:{},cur:null};S.classes=S.classes&&S.classes.list?S.classes:{list:{},cur:null};
   for(var k in c.list)S.classes.list[k]=c.list[k];if(c.cur&&S.classes.list[c.cur])S.classes.cur=c.cur;
   for(k in (v.sets||{}))S.sets[k]=v.sets[k];
-  for(k in (v.sessions||{})){var a=v.sessions[k],b=S.sessions[k];if(!b||sessAnsCount(a)>=sessAnsCount(b))S.sessions[k]=a}}
+  for(k in (v.sessions||{})){var a=v.sessions[k],b=S.sessions[k];if(!b||sessAnsCount(a)>=sessAnsCount(b))S.sessions[k]=a}
+  purgeDeleted()}
 function useHandle(h,read){
   return h.queryPermission({mode:'readwrite'}).then(function(p){return p==='granted'?p:h.requestPermission({mode:'readwrite'})}).then(function(p){
     if(p!=='granted'){toast('Accès au fichier refusé.');return}
@@ -898,8 +908,8 @@ function renderFile(){
   if(mode==='remote'){box.innerHTML='<span class="muted">Le fichier de données se gère sur l\'ordinateur du projecteur.</span>';bar.hidden=true;return}
   if(fileH){box.innerHTML='<span class="fileOk">Fichier « '+esc(fileH.name)+' » : enregistré'+(fileSaved?' à '+new Date(fileSaved).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'')+'</span>'+(fileErr?'<span style="color:var(--bad);font-weight:800">'+esc(fileErr)+'</span>':'')+'<button class="mini" data-file="open">Ouvrir un autre fichier</button>';
     bar.hidden=!fileErr;if(fileErr){bar.innerHTML='<b>'+esc(fileErr)+'</b>'+fileButtons();wireFile(bar)}}
-  else{box.innerHTML=fileButtons();bar.hidden=false;
-    bar.innerHTML='<b>'+(storedH?'Reprends ton fichier de données pour retrouver tes classes et résultats.':'Tes données ne sont pas encore enregistrées dans un fichier.')+'</b>'+fileButtons();wireFile(bar)}
+  else{box.innerHTML=fileButtons();bar.hidden=clientCount()>0;
+    bar.innerHTML='<b>'+(storedH?'Reprends ton fichier de données pour retrouver tes classes et résultats.':'Relie ton téléphone pour retrouver tes classes et résultats, ou ouvre ton fichier de données.')+'</b>'+fileButtons();wireFile(bar)}
   wireFile(box)}
 idbGet('file').then(function(h){storedH=h||null;renderFile()});
 
