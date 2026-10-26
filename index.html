@@ -152,7 +152,7 @@ tfoot td{font-weight:800;background:var(--bg)}
 <body>
 <div class="wrap">
   <header>
-    <h1>Cartes-réponses</h1><span class="muted" style="font-size:12px">version 4</span>
+    <h1>Cartes-réponses</h1><span class="muted" style="font-size:12px">version 5</span>
     <span class="link" id="link"></span>
     <nav class="tabs" role="tablist">
       <button role="tab" data-v="proj" aria-selected="true">Projeter</button>
@@ -781,7 +781,7 @@ $('#c-save').onclick=function(){var st={};$$('#c-roster input').forEach(function
   S.classe={name:$('#c-name').value.trim(),students:st};classDirty=false;writeDoc('config/classe',S.classe,false);rerender();toast('Classe enregistrée')};
 
 /* ---------- RÉSULTATS ---------- */
-var resConfirm=false;
+var resConfirm=false,resPicked=false,resCount=-1;
 function sessSorted(){return Object.keys(S.sessions).map(function(k){return {id:k,s:S.sessions[k]}}).sort(function(a,b){return String(b.s.startedAt).localeCompare(String(a.s.startedAt))})}
 function dstr(iso){try{return new Date(iso).toLocaleDateString('fr-CH',{weekday:'short',day:'numeric',month:'short'})+' '+new Date(iso).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})}catch(e){return iso}}
 function grid(x){var qs=x.s.questions||[],ans=x.s.answers||{},nums=named().slice();
@@ -791,7 +791,8 @@ function renderRes(){
   $('#r-remote').hidden=mode!=='remote';
   var sel=$('#r-sess'),cur=sel.value,list=sessSorted();
   sel.innerHTML=list.map(function(x){return '<option value="'+esc(x.id)+'">'+esc(dstr(x.s.startedAt))+' · '+esc(x.s.title)+'</option>'}).join('')||'<option value="">Aucune séance</option>';
-  if(cur&&S.sessions[cur])sel.value=cur;
+  if(list.length!==resCount){resCount=list.length;resPicked=false}
+  if(resPicked&&cur&&S.sessions[cur])sel.value=cur;else if(list.length)sel.value=list[0].id;
   var x=list.find(function(y){return y.id===sel.value});$('#r-csv').disabled=$('#r-del').disabled=!x;
   var cf=$('#r-confirm');cf.hidden=!resConfirm||!x;
   if(!x){$('#r-tbl').innerHTML='';$('#r-sum').textContent='Lance une série pour voir les résultats ici.';}
@@ -811,7 +812,7 @@ function renderRes(){
   var ks=Object.keys(tot).map(Number).sort(function(a,b){return a-b});
   $('#r-all').innerHTML=ks.length?'<thead><tr><th class="l">Carte</th><th class="l">Élève</th><th>Séances</th><th>Réponses</th><th>Justes</th><th>Réussite</th></tr></thead><tbody>'+ks.map(function(n){var t=tot[n];return '<tr><td class="l">'+n+'</td><td class="l">'+esc(nameOf(n))+'</td><td>'+Object.keys(t.s).length+'</td><td>'+t.n+'</td><td>'+t.ok+'</td><td><b>'+Math.round(t.ok*100/t.n)+' %</b></td></tr>'}).join('')+'</tbody>':'<tbody><tr><td class="muted">Pas encore de réponses.</td></tr></tbody>';
 }
-$('#r-sess').onchange=function(){resConfirm=false;renderRes()};
+$('#r-sess').onchange=function(){resConfirm=false;resPicked=true;renderRes()};
 $('#r-del').onclick=function(){resConfirm=true;renderRes()};
 $('#r-csv').onclick=function(){var x=sessSorted().find(function(y){return y.id===$('#r-sess').value});if(!x)return;var G=grid(x);
   var L=[['Carte','Élève'].concat(G.qs.map(function(_,i){return 'Q'+(i+1)})).concat(['Score','Sur'])];
