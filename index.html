@@ -152,7 +152,7 @@ tfoot td{font-weight:800;background:var(--bg)}
 <body>
 <div class="wrap">
   <header>
-    <h1>Cartes-réponses</h1><span class="muted" style="font-size:12px">version 5</span>
+    <h1>Cartes-réponses</h1><span class="muted" style="font-size:12px">version 6</span>
     <span class="link" id="link"></span>
     <nav class="tabs" role="tablist">
       <button role="tab" data-v="proj" aria-selected="true">Projeter</button>
@@ -167,6 +167,7 @@ tfoot td{font-weight:800;background:var(--bg)}
   <!-- PROJETER -->
   <section class="panel" id="v-proj">
     <div class="row">
+      <select id="p-class" aria-label="Classe"></select>
       <select id="p-set" aria-label="Série de questions"></select>
       <button class="btn solid" id="p-start">Lancer la série</button>
       <span class="muted" id="p-info"></span>
@@ -203,10 +204,9 @@ tfoot td{font-weight:800;background:var(--bg)}
 
   <!-- CLASSE -->
   <section class="panel" id="v-class" hidden>
-    <div class="row"><h2 style="flex:1">Ma classe</h2><button class="btn solid" id="c-save">Enregistrer</button></div>
-    <div class="row"><label for="c-name">Nom de la classe</label><input id="c-name" placeholder="10LC"></div>
-    <p class="note" style="margin:0">Chaque élève garde toujours la même carte. Écris le prénom en face du numéro de sa carte ; laisse vide les cartes non distribuées.</p>
-    <div class="roster" id="c-roster"></div>
+    <div class="row"><h2 style="flex:1">Mes classes</h2><button class="btn" id="c-add">Ajouter une classe</button></div>
+    <p class="note" style="margin:0">Seuls le nom de la classe et le nombre d'élèves sont enregistrés, aucun prénom. Distribue les cartes 1, 2, 3… et garde de ton côté la liste « numéro de carte → élève » : chaque élève reprend toujours la même carte.</p>
+    <div class="setList" id="c-list"></div>
     <h3>Sauvegarde</h3>
     <p class="note" style="margin:0">Tout (classe, séries, résultats) est enregistré dans le navigateur de cet ordinateur. Fais une sauvegarde de temps en temps ; elle sert aussi à tout transférer sur un autre ordinateur.</p>
     <div class="row"><button class="btn" id="c-backup">Télécharger une sauvegarde</button><label class="btn ghost" for="c-restore" style="display:inline-flex;align-items:center;position:relative">Restaurer une sauvegarde<input type="file" id="c-restore" accept=".json,application/json" style="position:absolute;inset:0;opacity:0;width:100%"></label></div>
@@ -215,15 +215,17 @@ tfoot td{font-weight:800;background:var(--bg)}
   <!-- RÉSULTATS -->
   <section class="panel" id="v-res" hidden>
     <div class="row">
+      <select id="r-class" aria-label="Classe"></select>
       <select id="r-sess" aria-label="Séance"></select>
-      <button class="btn" id="r-csv">Exporter en CSV</button>
+      <button class="btn" id="r-csv">Exporter cette séance</button>
       <button class="btn danger" id="r-del" style="margin-left:auto">Supprimer cette séance</button>
     </div>
     <div id="r-confirm" class="note" hidden></div>
     <div id="r-sum" class="muted"></div>
     <div class="tbl"><table id="r-tbl"></table></div>
     <p class="muted" id="r-remote" hidden style="margin:0">Sur le téléphone relié, seule la séance en cours s'affiche : l'historique complet est sur l'ordinateur.</p>
-    <h3>Bilan par élève, toutes séances</h3>
+    <div class="row"><h3 style="flex:1">Bilan de la classe, toutes séances</h3><button class="btn solid" id="r-csvall">Exporter tous les résultats de la classe</button></div>
+    <p class="muted" style="margin:0;font-size:14px">Les résultats sont enregistrés automatiquement sur cet ordinateur. L'export crée un fichier pour Excel, une ligne par carte et une colonne par séance, avec une colonne « Prénom » vide à compléter chez toi.</p>
     <div class="tbl"><table id="r-all"></table></div>
   </section>
 </div>
@@ -464,7 +466,7 @@ function lsSetK(k,v){try{if(v==null)localStorage.removeItem(k);else localStorage
 function render(){renderProj();renderScan();renderSets();renderClass();renderRes();renderLink()}
 var rq=0;function rerender(){if(rq)return;rq=requestAnimationFrame(function(){rq=0;render()})}
 function applyWrite(path,data){var p=path.split('/');
-  if(p[0]==='config'&&data)S.classe=data;else if(p[0]==='live')S.live=data||{};
+  if(path==='config/classes'&&data)S.classes=data;else if(p[0]==='config'&&data)S.classe=data;else if(p[0]==='live')S.live=data||{};
   else if((p[0]==='sets'||p[0]==='sessions')&&p[1]){if(data==null)delete S[p[0]][p[1]];else S[p[0]][p[1]]=data}}
 function writeDoc(path,data){data=clone(data);applyWrite(path,data);if(mode==='remote')rsend({t:'w',path:path,data:data});else{lsPut();broadcast(path.indexOf('sets/')===0)}rerender();return Promise.resolve()}
 function delDoc(path){return writeDoc(path,null)}
@@ -477,7 +479,7 @@ function deepMerge(a,b){for(var k in b){if(b[k]&&typeof b[k]==='object'&&!Array.
 var PREFIX='cartes-rep-wlb-',mode='host',peer=null,linkMsg='',myCode=null,remoteCode=null,peerReady=false;
 var clients={},remoteOk=false,lastState=0,helloT=null,outbox=[];
 function code4(){return String(Math.floor(1000+Math.random()*9000))}
-function snapshotFor(full){var L=S.live&&S.live.sessionId,ss={};if(L&&S.sessions[L])ss[L]=S.sessions[L];var o={classe:S.classe,live:S.live,sessions:ss};if(full)o.sets=S.sets;return o}
+function snapshotFor(full){var L=S.live&&S.live.sessionId,ss={};if(L&&S.sessions[L])ss[L]=S.sessions[L];var o={classe:S.classe,classes:S.classes,live:S.live,sessions:ss};if(full)o.sets=S.sets;return o}
 var CH=2800,rx={};
 function relaySend(dst,msg){if(!peer||!peer.socket||peer.destroyed||!peerReady)return false;
   var j=JSON.stringify(msg),id=Math.random().toString(36).slice(2,8),n=Math.ceil(j.length/CH)||1;
@@ -530,7 +532,7 @@ function startRemote(code){
     linkMsg='Étape 2/3 : connexion au service de liaison…';rerender();
     peer=new Peer({debug:0});
     relayHook(function(src,m){if(src!==PREFIX+remoteCode||!m)return;
-      if(m.t==='state'&&m.S){S.classe=m.S.classe||{name:'',students:{}};S.live=m.S.live||{};if(m.S.sets)S.sets=m.S.sets;for(var k in m.S.sessions)S.sessions[k]=m.S.sessions[k];
+      if(m.t==='state'&&m.S){S.classe=m.S.classe||{name:'',students:{}};if(m.S.classes)S.classes=m.S.classes;S.live=m.S.live||{};if(m.S.sets)S.sets=m.S.sets;for(var k in m.S.sessions)S.sessions[k]=m.S.sessions[k];
         lastState=Date.now();if(!remoteOk){remoteOk=true;linkMsg='';var o=outbox;outbox=[];o.forEach(function(x){relaySend(PREFIX+remoteCode,x)})}rerender()}});
     peer.on('open',function(){peerReady=true;hello(true)});
     peer.on('error',function(e){if(mode!=='remote')return;linkMsg='Liaison interrompue, reconnexion…';remoteOk=false;rerender()});
@@ -545,7 +547,7 @@ function startRemote(code){
 }
 function rerenderLinkOnly(){try{renderLink()}catch(e){}}
 function stopRemote(){mode='host';remoteCode=null;remoteOk=false;clearTimeout(helloT);lsSetK('cr-remote',null);if(peer)try{peer.destroy()}catch(e){}peer=null;outbox=[];loadLocal();startHost();rerender()}
-function loadLocal(){S={classe:{name:'',students:{}},sets:{},sessions:{},live:{}};var v=lsGet();if(v)S=deepMerge(S,v);if(!Object.keys(S.sets).length){S.sets['set-puissances-l1']=clone(SEED);lsPut()}}
+function loadLocal(){S={classe:{name:'',students:{}},classes:{list:{},cur:null},sets:{},sessions:{},live:{}};var v=lsGet();if(v)S=deepMerge(S,v);migrateClasses();if(!Object.keys(S.sets).length){S.sets['set-puissances-l1']=clone(SEED);lsPut()}}
 function renderLink(){var el=$('#link');
   if(mode==='remote'){el.className='link'+(remoteOk?' ok':'');el.innerHTML=remoteOk?'Relié à l\'ordinateur <b>'+esc(remoteCode)+'</b>':esc(linkMsg||'Connexion…')}
   else{var n=clientCount();el.className='link'+(n?' ok':'');
@@ -593,8 +595,14 @@ function setsSorted(){return Object.keys(S.sets).map(function(k){return {id:k,s:
 function liveSession(){var id=S.live&&S.live.sessionId;return id&&S.sessions[id]?{id:id,s:S.sessions[id]}:null}
 function liveQ(){var L=liveSession();if(!L)return null;var qs=L.s.questions||[];var i=Math.max(0,Math.min(qs.length-1,S.live.q||0));return {L:L,i:i,Q:qs[i],qs:qs}}
 function answersFor(L,i){return (L.s.answers&&L.s.answers['q'+i])||{}}
-function named(){var st=(S.classe&&S.classe.students)||{},out=[];for(var n=1;n<=NCARDS;n++)if(st[n]&&String(st[n]).trim())out.push(n);return out}
-function nameOf(n){var st=(S.classe&&S.classe.students)||{};return st[n]&&String(st[n]).trim()||('Carte '+n)}
+function migrateClasses(){if(!S.classes||!S.classes.list)S.classes={list:{},cur:null};
+  if(!Object.keys(S.classes.list).length&&S.classe&&(S.classe.name||Object.keys(S.classe.students||{}).length)){var mx=0;for(var k in (S.classe.students||{}))mx=Math.max(mx,+k);
+    var id=uid('c');S.classes.list[id]={name:S.classe.name||'Ma classe',count:mx||24};S.classes.cur=id;lsPut()}}
+function classesSorted(){var L=(S.classes&&S.classes.list)||{};return Object.keys(L).map(function(k){return {id:k,c:L[k]}}).sort(function(a,b){return String(a.c.name).localeCompare(String(b.c.name),'fr')})}
+function curClass(){var L=(S.classes&&S.classes.list)||{},id=S.classes&&S.classes.cur;if(id&&L[id])return Object.assign({id:id},L[id]);var f=classesSorted()[0];return f?Object.assign({id:f.id},f.c):null}
+function rosterCount(sess){if(sess&&sess.count)return sess.count;if(sess&&sess.classId)return 0;var c=curClass();return c?c.count:0}
+function named(sess){if(sess===undefined){var L=liveSession();sess=L?L.s:null}var n=Math.min(NCARDS,+rosterCount(sess)||0),out=[];for(var i=1;i<=n;i++)out.push(i);return out}
+function nameOf(n){return 'Carte '+n}
 function setLive(p){S.live=Object.assign({},S.live,p);rerender();return writeDoc('live/state',S.live,false)}
 
 /* ---------- onglets ---------- */
@@ -611,6 +619,7 @@ function fit(){var box=$('#stageBox'),st=$('#stage');var fs=document.fullscreenE
 window.addEventListener('resize',fit);document.addEventListener('fullscreenchange',function(){setTimeout(fit,50)});
 var projSeen={};
 function renderProj(){
+  var pc=$('#p-class'),cls=classesSorted(),cc=curClass();pc.innerHTML=cls.map(function(x){return '<option value="'+esc(x.id)+'">'+esc(x.c.name)+' ('+x.c.count+' élèves)</option>'}).join('')||'<option value="">Aucune classe : ajoute-la dans l\'onglet Classe</option>';if(cc)pc.value=cc.id;
   var sel=$('#p-set'),cur=sel.value,list=setsSorted();
   sel.innerHTML=list.map(function(x){return '<option value="'+esc(x.id)+'">'+esc(x.s.title)+' ('+(x.s.questions||[]).length+' q.)</option>'}).join('')||'<option value="">Aucune série</option>';
   if(cur&&S.sets[cur])sel.value=cur;else if(liveSession()&&S.sets[liveSession().s.setId])sel.value=liveSession().s.setId;
@@ -635,8 +644,9 @@ function renderProj(){
   h+='<div class="s-chips">'+nums.map(function(n){return '<span class="'+(ans[n]?'on':'')+(fresh[n]?' new':'')+'">'+n+'</span>'}).join('')+'</div>';
   st.innerHTML=h;fit();
 }
+$('#p-class').onchange=function(){var v=this.value;if(!v)return;var c=clone(S.classes)||{list:{},cur:null};c.cur=v;writeDoc('config/classes',c)};
 $('#p-start').onclick=function(){var id=$('#p-set').value,set=S.sets[id];if(!set||!(set.questions||[]).length){toast('Cette série est vide.');return}
-  var sid=uid('s'),d=new Date();var sess={setId:id,title:set.title,questions:set.questions,startedAt:d.toISOString(),answers:{}};
+  var sid=uid('s'),d=new Date();var cl=curClass();var sess={setId:id,title:set.title,questions:set.questions,startedAt:d.toISOString(),answers:{},classId:cl?cl.id:null,className:cl?cl.name:'',count:cl?cl.count:0};
   S.sessions[sid]=sess;writeDoc('sessions/'+sid,sess,false).then(function(){return setLive({sessionId:sid,q:0,reveal:false})});toast('Série lancée');};
 function go(dl){var lq=liveQ();if(!lq)return;var n=Math.max(0,Math.min(lq.qs.length-1,lq.i+dl));if(n!==lq.i)setLive({q:n,reveal:false})}
 function rev(){var lq=liveQ();if(!lq)return;setLive({reveal:!S.live.reveal})}
@@ -768,27 +778,40 @@ function drawEdit(){
 }
 
 /* ---------- CLASSE ---------- */
-var classDirty=false;
+var classDirty=false,classDel=null;
+function saveClasses(c){writeDoc('config/classes',c)}
 function renderClass(){
   if(classDirty)return;
-  $('#c-name').value=(S.classe&&S.classe.name)||'';var st=(S.classe&&S.classe.students)||{},h='';
-  for(var n=1;n<=NCARDS;n++)h+='<div class="rs"><span>'+n+'</span><input id="c-s'+n+'" data-n="'+n+'" placeholder="Prénom" value="'+esc(st[n]||'')+'" aria-label="Élève de la carte '+n+'"></div>';
-  $('#c-roster').innerHTML=h;
-  $$('#c-roster input').forEach(function(i){i.oninput=function(){classDirty=true}});
+  var cls=classesSorted(),cc=curClass();
+  $('#c-list').innerHTML=cls.map(function(x){return '<div class="setItem"><input id="cn-'+esc(x.id)+'" data-id="'+esc(x.id)+'" data-f="name" value="'+esc(x.c.name)+'" aria-label="Nom de la classe" style="flex:1;min-width:140px">'+
+    '<label for="cc-'+esc(x.id)+'">Élèves</label><input id="cc-'+esc(x.id)+'" data-id="'+esc(x.id)+'" data-f="count" type="number" min="1" max="'+NCARDS+'" value="'+(+x.c.count||0)+'" style="width:80px">'+
+    (cc&&cc.id===x.id?'<span class="link ok">Classe active</span>':'<button class="mini" data-act="'+esc(x.id)+'">Choisir</button>')+
+    (classDel===x.id?'<button class="mini" data-del="'+esc(x.id)+'" style="color:var(--bad);border-color:var(--bad)">Confirmer</button>':'<button class="mini" data-ask="'+esc(x.id)+'">Supprimer</button>')+'</div>'}).join('')||'<p class="muted" style="margin:0">Aucune classe pour l\'instant : ajoute la première.</p>';
+  $$('#c-list input').forEach(function(i){i.oninput=function(){classDirty=true};i.onchange=function(){var c=clone(S.classes),id=i.getAttribute('data-id'),f=i.getAttribute('data-f');if(!c.list[id])return;
+    if(f==='count'){var n=Math.max(1,Math.min(NCARDS,parseInt(i.value,10)||1));c.list[id].count=n}else c.list[id].name=i.value.trim()||'Classe';classDirty=false;saveClasses(c);toast('Classe enregistrée')}});
+  $$('#c-list [data-act]').forEach(function(b){b.onclick=function(){var c=clone(S.classes);c.cur=b.getAttribute('data-act');saveClasses(c)}});
+  $$('#c-list [data-ask]').forEach(function(b){b.onclick=function(){classDel=b.getAttribute('data-ask');renderClass()}});
+  $$('#c-list [data-del]').forEach(function(b){b.onclick=function(){var c=clone(S.classes),id=b.getAttribute('data-del');delete c.list[id];if(c.cur===id)c.cur=null;classDel=null;saveClasses(c);toast('Classe supprimée (ses résultats restent dans Résultats)')}});
 }
-$('#c-name').oninput=function(){classDirty=true};
-$('#c-save').onclick=function(){var st={};$$('#c-roster input').forEach(function(i){var v=i.value.trim();if(v)st[i.getAttribute('data-n')]=v});
-  S.classe={name:$('#c-name').value.trim(),students:st};classDirty=false;writeDoc('config/classe',S.classe,false);rerender();toast('Classe enregistrée')};
+$('#c-add').onclick=function(){var c=clone(S.classes)||{list:{},cur:null};c.list=c.list||{};var id=uid('c');c.list[id]={name:'Nouvelle classe',count:24};if(!c.cur)c.cur=id;saveClasses(c);
+  setTimeout(function(){var n=$('#cn-'+id);if(n){n.focus();n.select()}},60)};
 
 /* ---------- RÉSULTATS ---------- */
 var resConfirm=false,resPicked=false,resCount=-1;
-function sessSorted(){return Object.keys(S.sessions).map(function(k){return {id:k,s:S.sessions[k]}}).sort(function(a,b){return String(b.s.startedAt).localeCompare(String(a.s.startedAt))})}
+var resClass='',resClassPicked=false;
+function sessSorted(){return Object.keys(S.sessions).map(function(k){return {id:k,s:S.sessions[k]}}).filter(function(x){return !resClass||(resClass==='none'?!x.s.classId:x.s.classId===resClass)}).sort(function(a,b){return String(b.s.startedAt).localeCompare(String(a.s.startedAt))})}
 function dstr(iso){try{return new Date(iso).toLocaleDateString('fr-CH',{weekday:'short',day:'numeric',month:'short'})+' '+new Date(iso).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})}catch(e){return iso}}
-function grid(x){var qs=x.s.questions||[],ans=x.s.answers||{},nums=named().slice();
+function grid(x){var qs=x.s.questions||[],ans=x.s.answers||{},nums=named(x.s).slice();
   qs.forEach(function(_,i){Object.keys(ans['q'+i]||{}).forEach(function(n){n=+n;if(nums.indexOf(n)<0)nums.push(n)})});nums.sort(function(a,b){return a-b});
   return {qs:qs,ans:ans,nums:nums}}
 function renderRes(){
   $('#r-remote').hidden=mode!=='remote';
+  var rcs=$('#r-class'),cls=classesSorted(),hasNone=Object.keys(S.sessions).some(function(k){return !S.sessions[k].classId});
+  if(!resClassPicked){var all=Object.keys(S.sessions).map(function(k){return S.sessions[k]}).sort(function(a,b){return String(b.startedAt).localeCompare(String(a.startedAt))});
+    var nk=all.length?(all[0].classId||'none'):'';if(nk)resClass=nk;else if(resClass===''){var cc=curClass();if(cc)resClass=cc.id}}
+  rcs.innerHTML=cls.map(function(x){return '<option value="'+esc(x.id)+'">'+esc(x.c.name)+'</option>'}).join('')+(hasNone||!cls.length?'<option value="none">Sans classe</option>':'');
+  if(resClass&&![].slice.call(rcs.options).some(function(o){return o.value===resClass}))resClass=rcs.options.length?rcs.options[0].value:'';
+  rcs.value=resClass;
   var sel=$('#r-sess'),cur=sel.value,list=sessSorted();
   sel.innerHTML=list.map(function(x){return '<option value="'+esc(x.id)+'">'+esc(dstr(x.s.startedAt))+' · '+esc(x.s.title)+'</option>'}).join('')||'<option value="">Aucune séance</option>';
   if(list.length!==resCount){resCount=list.length;resPicked=false}
@@ -797,11 +820,11 @@ function renderRes(){
   var cf=$('#r-confirm');cf.hidden=!resConfirm||!x;
   if(!x){$('#r-tbl').innerHTML='';$('#r-sum').textContent='Lance une série pour voir les résultats ici.';}
   else{
-    var G=grid(x),h='<thead><tr><th class="l">Carte</th><th class="l">Élève</th>'+G.qs.map(function(_,i){return '<th>Q'+(i+1)+'</th>'}).join('')+'<th>Score</th></tr></thead><tbody>',colOk=G.qs.map(function(){return 0}),colN=G.qs.map(function(){return 0});
-    G.nums.forEach(function(n){var ok=0;h+='<tr><td class="l">'+n+'</td><td class="l">'+esc(nameOf(n))+'</td>';
+    var G=grid(x),h='<thead><tr><th class="l">Carte</th>'+G.qs.map(function(_,i){return '<th>Q'+(i+1)+'</th>'}).join('')+'<th>Score</th></tr></thead><tbody>',colOk=G.qs.map(function(){return 0}),colN=G.qs.map(function(){return 0});
+    G.nums.forEach(function(n){var ok=0;h+='<tr><td class="l">'+n+'</td>';
       G.qs.forEach(function(Q,i){var a=(G.ans['q'+i]||{})[n];if(!a){h+='<td class="na">–</td>';return}colN[i]++;var g=LET.indexOf(a)===Q.a;if(g){ok++;colOk[i]++}h+='<td class="'+(g?'ok':'ko')+'">'+a+'</td>'});
       h+='<td><b>'+ok+'</b> / '+G.qs.length+'</td></tr>'});
-    h+='</tbody><tfoot><tr><td class="l" colspan="2">Réussite</td>'+G.qs.map(function(_,i){return '<td>'+(colN[i]?Math.round(colOk[i]*100/colN[i])+' %':'–')+'</td>'}).join('')+'<td></td></tr></tfoot>';
+    h+='</tbody><tfoot><tr><td class="l">Réussite</td>'+G.qs.map(function(_,i){return '<td>'+(colN[i]?Math.round(colOk[i]*100/colN[i])+' %':'–')+'</td>'}).join('')+'<td></td></tr></tfoot>';
     $('#r-tbl').innerHTML=h;
     $('#r-sum').innerHTML='Bonne réponse par question : '+G.qs.map(function(Q,i){return 'Q'+(i+1)+' '+LET[Q.a]}).join(' · ');
     cf.innerHTML='Supprimer définitivement la séance du '+esc(dstr(x.s.startedAt))+' ? <button class="mini" id="r-yes" style="color:var(--bad);border-color:var(--bad)">Oui, supprimer</button> <button class="mini" id="r-no">Annuler</button>';
@@ -810,22 +833,30 @@ function renderRes(){
   // bilan global
   var tot={};list.forEach(function(y){var G=grid(y);G.nums.forEach(function(n){G.qs.forEach(function(Q,i){var a=(G.ans['q'+i]||{})[n];if(!a)return;var t=tot[n]=tot[n]||{ok:0,n:0,s:{}};t.n++;t.s[y.id]=1;if(LET.indexOf(a)===Q.a)t.ok++})})});
   var ks=Object.keys(tot).map(Number).sort(function(a,b){return a-b});
-  $('#r-all').innerHTML=ks.length?'<thead><tr><th class="l">Carte</th><th class="l">Élève</th><th>Séances</th><th>Réponses</th><th>Justes</th><th>Réussite</th></tr></thead><tbody>'+ks.map(function(n){var t=tot[n];return '<tr><td class="l">'+n+'</td><td class="l">'+esc(nameOf(n))+'</td><td>'+Object.keys(t.s).length+'</td><td>'+t.n+'</td><td>'+t.ok+'</td><td><b>'+Math.round(t.ok*100/t.n)+' %</b></td></tr>'}).join('')+'</tbody>':'<tbody><tr><td class="muted">Pas encore de réponses.</td></tr></tbody>';
+  $('#r-all').innerHTML=ks.length?'<thead><tr><th class="l">Carte</th><th>Séances</th><th>Réponses</th><th>Justes</th><th>Réussite</th></tr></thead><tbody>'+ks.map(function(n){var t=tot[n];return '<tr><td class="l">'+n+'</td><td>'+Object.keys(t.s).length+'</td><td>'+t.n+'</td><td>'+t.ok+'</td><td><b>'+Math.round(t.ok*100/t.n)+' %</b></td></tr>'}).join('')+'</tbody>':'<tbody><tr><td class="muted">Pas encore de réponses.</td></tr></tbody>';
 }
+$('#r-class').onchange=function(){resClass=this.value;resClassPicked=true;resPicked=false;resCount=-1;resConfirm=false;renderRes()};
 $('#r-sess').onchange=function(){resConfirm=false;resPicked=true;renderRes()};
 $('#r-del').onclick=function(){resConfirm=true;renderRes()};
 $('#r-csv').onclick=function(){var x=sessSorted().find(function(y){return y.id===$('#r-sess').value});if(!x)return;var G=grid(x);
-  var L=[['Carte','Élève'].concat(G.qs.map(function(_,i){return 'Q'+(i+1)})).concat(['Score','Sur'])];
-  G.nums.forEach(function(n){var ok=0,r=[n,nameOf(n)];G.qs.forEach(function(Q,i){var a=(G.ans['q'+i]||{})[n]||'';if(a&&LET.indexOf(a)===Q.a)ok++;r.push(a)});r.push(ok,G.qs.length);L.push(r)});
-  var csv='﻿'+L.map(function(r){return r.map(function(c){c=String(c);return /[;"\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c}).join(';')}).join('\r\n');
-  var fn='Resultats '+(x.s.title||'').replace(/[^\wÀ-ÿ ·-]/g,'').slice(0,60)+' '+String(x.s.startedAt).slice(0,10)+'.csv';
+  var L=[['Carte','Prénom'].concat(G.qs.map(function(_,i){return 'Q'+(i+1)})).concat(['Score','Sur'])];
+  G.nums.forEach(function(n){var ok=0,r=[n,''];G.qs.forEach(function(Q,i){var a=(G.ans['q'+i]||{})[n]||'';if(a&&LET.indexOf(a)===Q.a)ok++;r.push(a)});r.push(ok,G.qs.length);L.push(r)});
+  var csv=toCsv(L);
+  var fn=(x.s.className?x.s.className+' ':'')+'Resultats '+(x.s.title||'').replace(/[^\wÀ-ÿ ·-]/g,'').slice(0,60)+' '+String(x.s.startedAt).slice(0,10)+'.csv';
   saveFile(fn,new Blob([csv],{type:'text/csv;charset=utf-8'}))};
+function toCsv(L){return '\ufeff'+L.map(function(r){return r.map(function(c){c=String(c==null?'':c);return /[;"\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c}).join(';')}).join('\r\n')}
+$('#r-csvall').onclick=function(){var list=sessSorted().slice().reverse();if(!list.length){toast('Aucune séance pour cette classe.');return}
+  var nums=[];list.forEach(function(y){grid(y).nums.forEach(function(n){if(nums.indexOf(n)<0)nums.push(n)})});nums.sort(function(a,b){return a-b});
+  var head=['Carte','Prénom'];list.forEach(function(y){var d=new Date(y.s.startedAt);head.push((isNaN(d)?'':d.toLocaleDateString('fr-CH'))+' '+(y.s.title||'')+' (sur '+(y.s.questions||[]).length+')')});head.push('Total justes','Total répondues','Réussite %');
+  var L=[head];nums.forEach(function(n){var r=[n,''],tj=0,tr=0;list.forEach(function(y){var G=grid(y),ok=0,rep=0;G.qs.forEach(function(Q,i){var a=(G.ans['q'+i]||{})[n];if(!a)return;rep++;if(LET.indexOf(a)===Q.a)ok++});r.push(rep?ok:'');tj+=ok;tr+=rep});r.push(tj,tr,tr?Math.round(tj*100/tr):'');L.push(r)});
+  var cname=resClass==='none'?'Sans classe':((S.classes.list[resClass]||{}).name||'Classe');
+  saveFile(cname.replace(/[\\/:*?"<>|]/g,'')+' - tous les resultats '+new Date().toISOString().slice(0,10)+'.csv',new Blob([toCsv(L)],{type:'text/csv;charset=utf-8'}))};
 function saveFile(name,blob){var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},1500)}
 $('#c-backup').onclick=function(){if(mode==='remote'){toast('Fais la sauvegarde sur l\'ordinateur.');return}
   saveFile('Cartes-reponses sauvegarde '+new Date().toISOString().slice(0,10)+'.json',new Blob([JSON.stringify(S,null,1)],{type:'application/json'}))};
 $('#c-restore').onchange=function(){var f=this.files&&this.files[0];this.value='';if(!f)return;if(mode==='remote'){toast('Restaure la sauvegarde sur l\'ordinateur.');return}
   var r=new FileReader();r.onload=function(){try{var v=JSON.parse(r.result);if(!v||typeof v!=='object'||!v.sets)throw 0;
-    S={classe:v.classe||{name:'',students:{}},sets:v.sets||{},sessions:v.sessions||{},live:{}};classDirty=false;lsPut();broadcast(true);rerender();toast('Sauvegarde restaurée')}catch(e){toast('Ce fichier n\'est pas une sauvegarde de Cartes-réponses.')}};r.readAsText(f)};
+    S={classe:v.classe||{name:'',students:{}},classes:v.classes||{list:{},cur:null},sets:v.sets||{},sessions:v.sessions||{},live:{}};migrateClasses();classDirty=false;lsPut();broadcast(true);rerender();toast('Sauvegarde restaurée')}catch(e){toast('Ce fichier n\'est pas une sauvegarde de Cartes-réponses.')}};r.readAsText(f)};
 
 var rc=lsGetK('cr-remote');
 if(rc){myCode=lsGetK('cr-code');startRemote(rc)}else{loadLocal();startHost()}
