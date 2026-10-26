@@ -1,0 +1,815 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#6C4AB6">
+<title>Cartes-réponses</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@500;700;800&display=swap">
+<style>
+/* Plan : outil de classe — barre d'onglets, cartes de travail sobres ; la vue Projeter reprend la scène papier violette du Défi éclair. */
+:root{
+  --bg:#F6F3FB; --surf:#FFFFFF; --ink:#2B2A33; --ink2:#5C5970; --line:#DED8EC;
+  --acc:#6C4AB6; --accD:#4A2F8F; --accS:#EEE8FA;
+  --good:#2E7D5B; --goodS:#DDF1E6; --bad:#B3364B; --badS:#F8E1E5; --warn:#A8670F;
+  --paper:#FFF8EC; --pInk:#2B2A33; --pPur:#6C4AB6; --pPurD:#4A2F8F; --pPurS:#F1ECFA; --pGrn:#2E7D5B; --pGrnS:#CFEBDD;
+  --fd:'Fredoka','Trebuchet MS',sans-serif; --fb:'Nunito','Segoe UI',system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#17151F; --surf:#211E2C; --ink:#EEEAF7; --ink2:#ADA7C2; --line:#383349;
+  --acc:#A98BF0; --accD:#C9B6FA; --accS:#2E2742; --good:#5FC596; --goodS:#1D3A2D; --bad:#F07A8E; --badS:#43212A; --warn:#E6A44A; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#17151F; --surf:#211E2C; --ink:#EEEAF7; --ink2:#ADA7C2; --line:#383349;
+  --acc:#A98BF0; --accD:#C9B6FA; --accS:#2E2742; --good:#5FC596; --goodS:#1D3A2D; --bad:#F07A8E; --badS:#43212A; --warn:#E6A44A; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+img{max-width:100%}
+html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--fb);font-size:16px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px 40px}
+.wrap{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+header{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+header h1{font-family:var(--fd);font-weight:700;font-size:26px;margin:0;color:var(--accD)}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+.tabs button{font:800 15px var(--fb);padding:8px 14px;border-radius:999px;border:2px solid var(--line);background:var(--surf);color:var(--ink2);cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--acc);border-color:var(--acc);color:#fff}
+.panel{background:var(--surf);border:1px solid var(--line);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+h2{font-family:var(--fd);font-weight:600;font-size:22px;margin:0;text-wrap:balance}
+h3{font-family:var(--fd);font-weight:600;font-size:18px;margin:0}
+.muted{color:var(--ink2)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.btn{font:800 15px var(--fb);padding:10px 16px;border-radius:12px;border:2px solid var(--acc);background:var(--accS);color:var(--accD);cursor:pointer;min-height:44px}
+.btn.solid{background:var(--acc);color:#fff}
+.btn.ghost{border-color:var(--line);background:transparent;color:var(--ink2)}
+.btn.danger{border-color:var(--bad);color:var(--bad);background:transparent}
+.btn:disabled{opacity:.45;cursor:default}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+input,select,textarea{font:600 15px var(--fb);color:var(--ink);background:var(--bg);border:1.5px solid var(--line);border-radius:10px;padding:8px 10px;min-width:0}
+textarea{resize:vertical}
+label{font-weight:800;font-size:13px;color:var(--ink2);letter-spacing:.3px}
+.note{font-size:14px;color:var(--ink2);background:var(--accS);border-radius:10px;padding:10px 12px}
+.toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;font-weight:800;z-index:50}
+sup{font-size:.62em;line-height:0;vertical-align:.75em}
+.frac{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:1.05;margin:0 .12em}
+.frac>span:first-child{border-bottom:.08em solid currentColor;padding:0 .15em}
+.frac>span{padding:0 .1em}
+
+/* ---- Projeter ---- */
+.stageBox{position:relative;width:100%;aspect-ratio:16/9;max-width:100%;border-radius:14px;overflow:hidden;background:var(--paper)}
+.stageBox:fullscreen{border-radius:0;aspect-ratio:auto;width:100vw;height:100vh;display:flex;align-items:center;justify-content:center}
+#stage{position:absolute;left:0;top:0;width:1280px;height:720px;transform-origin:0 0;background:var(--paper);color:var(--pInk);padding:36px 56px;display:flex;flex-direction:column;gap:18px;font-family:var(--fb)}
+.s-top{display:flex;align-items:center;gap:16px}
+.s-tag{font-family:var(--fd);font-weight:600;font-size:22px;color:var(--pPurD);background:var(--pPurS);border:3px solid var(--pPur);border-radius:999px;padding:4px 18px;white-space:nowrap}
+.s-hint{margin-left:auto;font-size:22px;font-weight:800;color:#4A4858}
+.s-q{font-family:var(--fd);font-weight:600;font-size:68px;line-height:1.05;text-align:center;margin:0;text-wrap:balance}
+.s-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;flex:1;min-height:0}
+.s-a{position:relative;display:flex;align-items:center;gap:20px;font-family:var(--fd);font-weight:600;font-size:46px;background:var(--pPurS);border:4px solid var(--pPur);border-radius:22px;padding:6px 26px;overflow:hidden}
+.s-a .L{font-size:38px;color:var(--pPurD);width:56px;height:56px;border-radius:50%;border:4px solid var(--pPur);background:#fff;display:flex;align-items:center;justify-content:center;flex:none;z-index:1}
+.s-a .T{z-index:1;min-width:0}
+.s-a .bar{position:absolute;left:0;top:0;bottom:0;background:rgba(108,74,182,.18);width:0;transition:width .5s ease}
+.s-a .N{margin-left:auto;z-index:1;font-size:36px;color:var(--pPurD)}
+.s-a.good{background:var(--pGrnS);border-color:var(--pGrn)}
+.s-a.good .bar{background:rgba(46,125,91,.25)}
+.s-a.dim{opacity:.5}
+.s-foot{display:flex;align-items:center;gap:14px;min-height:40px}
+.s-exp{font-size:26px;font-weight:800;color:var(--pPurD);flex:1}
+.s-count{font-family:var(--fd);font-weight:600;font-size:28px;color:#4A4858;white-space:nowrap}
+.s-count b{color:#B07F00}
+.s-chips{display:grid;grid-template-columns:repeat(20,1fr);gap:7px}
+.s-chips span{font:600 24px var(--fd);height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:#ECE6F5;color:#8A84A0;border:3px solid #DCD3EC}
+.s-chips span.on{background:#FFCB2E;border-color:#D9A200;color:#3A2C00}
+.s-chips span.new{animation:chipIn .6s ease}
+@keyframes chipIn{0%{transform:scale(.6)}60%{transform:scale(1.25)}100%{transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){.s-chips span.new{animation:none}}
+.s-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center}
+.s-empty b{font-family:var(--fd);font-size:56px}
+@media (prefers-reduced-motion:reduce){.s-a .bar{transition:none}}
+
+/* ---- Scanner ---- */
+.live{border:2px solid var(--acc);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px}
+.live .q{font-family:var(--fd);font-weight:600;font-size:24px}
+.shot{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:10px;font:800 18px var(--fb);background:var(--acc);color:#fff;border-radius:14px;padding:16px 20px;cursor:pointer;min-height:60px;text-align:center}
+.shot input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
+.scanImg{width:100%;height:auto;border-radius:12px;border:1px solid var(--line);display:block}
+.chips{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.chip{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;border:1.5px solid var(--line);background:var(--bg);font-weight:700;font-size:14px;cursor:pointer;text-align:left;color:var(--ink);min-width:0}
+.chip .n{font:700 13px var(--fd);width:26px;height:26px;border-radius:7px;background:var(--line);display:flex;align-items:center;justify-content:center;flex:none;color:var(--ink2)}
+.chip .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.chip .a{font:700 16px var(--fd);margin-left:auto}
+.chip.ok{border-color:var(--good);background:var(--goodS)} .chip.ok .a{color:var(--good)}
+.chip.ko{border-color:var(--bad);background:var(--badS)} .chip.ko .a{color:var(--bad)}
+.chip.any{border-color:var(--acc)} .chip.any .a{color:var(--accD)}
+.stat{font-variant-numeric:tabular-nums}
+
+.camBox{position:relative;border-radius:14px;overflow:hidden;background:#000;line-height:0}
+.camBox video{width:100%;height:auto;display:block}
+#s-ov{position:absolute;inset:0;width:100%;height:100%}
+.camTag{position:absolute;left:10px;top:10px;line-height:1.3;font:800 14px var(--fb);background:rgba(0,0,0,.6);color:#fff;border-radius:999px;padding:4px 10px}
+.camBox.paused video{opacity:.35}
+.btn.big{font-size:18px;min-height:56px;padding:12px 22px;flex:1}
+.link{font-size:14px;font-weight:800;color:var(--ink2);background:var(--accS);border-radius:999px;padding:5px 12px}
+.link b{font-family:var(--fd);font-size:17px;color:var(--accD);letter-spacing:1px}
+.link.ok{background:var(--goodS);color:var(--good)}
+.conn{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.conn input{width:120px;font:700 22px var(--fd);letter-spacing:4px;text-align:center}
+/* ---- Questions ---- */
+.qcard{border:1.5px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;background:var(--bg)}
+.qhead{display:flex;align-items:center;gap:8px}
+.qhead .num{font:600 18px var(--fd);color:var(--accD)}
+.qhead .sp{flex:1}
+.mini{font:800 13px var(--fb);padding:6px 10px;border-radius:8px;border:1.5px solid var(--line);background:var(--surf);color:var(--ink2);cursor:pointer;min-height:34px}
+.opts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.opt{display:flex;align-items:center;gap:8px;min-width:0}
+.opt input[type=text]{flex:1;width:100%}
+.opt input[type=radio]{width:20px;height:20px;accent-color:var(--good);flex:none}
+.opt b{font-family:var(--fd);width:20px}
+.prev{font-family:var(--fd);font-size:20px;color:var(--ink);min-height:28px}
+.setList{display:flex;flex-direction:column;gap:8px}
+.setItem{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid var(--line);border-radius:12px;flex-wrap:wrap}
+.setItem .t{font-weight:800;flex:1;min-width:150px}
+@media (max-width:560px){.opts{grid-template-columns:1fr}}
+
+/* ---- Classe ---- */
+.roster{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px}
+.rs{display:flex;align-items:center;gap:8px}
+.rs span{font:700 14px var(--fd);width:30px;height:30px;border-radius:8px;background:var(--accS);color:var(--accD);display:flex;align-items:center;justify-content:center;flex:none}
+.rs input{flex:1;width:100%}
+
+/* ---- Résultats ---- */
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:14px}
+th,td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:center;white-space:nowrap}
+th{font-weight:800;color:var(--ink2);background:var(--bg);position:sticky;top:0}
+td.l,th.l{text-align:left}
+td.ok{color:var(--good);font-weight:800;background:var(--goodS)}
+td.ko{color:var(--bad);font-weight:800;background:var(--badS)}
+td.na{color:var(--ink2)}
+tfoot td{font-weight:800;background:var(--bg)}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Cartes-réponses</h1>
+    <span class="link" id="link"></span>
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-v="proj" aria-selected="true">Projeter</button>
+      <button role="tab" data-v="scan">Scanner</button>
+      <button role="tab" data-v="sets">Questions</button>
+      <button role="tab" data-v="class">Classe</button>
+      <button role="tab" data-v="res">Résultats</button>
+    </nav>
+  </header>
+  <div id="storeNote" class="note" hidden></div>
+
+  <!-- PROJETER -->
+  <section class="panel" id="v-proj">
+    <div class="row">
+      <select id="p-set" aria-label="Série de questions"></select>
+      <button class="btn solid" id="p-start">Lancer la série</button>
+      <span class="muted" id="p-info"></span>
+    </div>
+    <div class="stageBox" id="stageBox"><div id="stage"></div></div>
+    <div class="row">
+      <button class="btn ghost" id="p-prev">← Précédente</button>
+      <button class="btn" id="p-reveal">Révéler la réponse</button>
+      <button class="btn ghost" id="p-next">Suivante →</button>
+      <button class="btn ghost" id="p-full" style="margin-left:auto">Plein écran</button>
+    </div>
+    <p class="muted" style="margin:0;font-size:14px">Clavier : ← → pour changer de question, espace pour révéler. Sur ton téléphone, ouvre cette même adresse, onglet Scanner, et tape le code affiché en haut.</p>
+  </section>
+
+  <!-- SCANNER -->
+  <section class="panel" id="v-scan" hidden>
+    <div id="s-conn"></div>
+    <div class="live" id="s-live"></div>
+    <div class="camBox" id="camBox" hidden><video id="s-video" playsinline muted autoplay></video><canvas id="s-ov"></canvas><span class="camTag" id="s-tag"></span></div>
+    <div class="row"><button class="btn solid big" id="s-go">Démarrer le scan</button><button class="btn danger" id="s-stop" hidden>Arrêter</button></div>
+    <div class="row"><button class="btn ghost" id="s-prev">← Question</button><button class="btn" id="s-reveal">Révéler au projecteur</button><button class="btn ghost" id="s-next">Question →</button></div>
+    <div id="s-status" class="muted" role="status"></div>
+    <div class="row"><h3>Réponses</h3><span class="muted stat" id="s-count"></span></div>
+    <div class="chips" id="s-chips"></div>
+    <p class="muted" style="margin:0;font-size:14px">Balaye lentement la classe, téléphone droit. Une carte est enregistrée dès qu'elle a été lue deux fois avec la même lettre ; si un élève change d'avis, la nouvelle lettre remplace l'ancienne. Le scan s'arrête tout seul quand toute la classe est lue. Touche un élève pour corriger sa réponse à la main.</p>
+  </section>
+
+  <!-- QUESTIONS -->
+  <section class="panel" id="v-sets" hidden>
+    <div class="row"><h2 style="flex:1">Séries de questions</h2><button class="btn" id="q-new">Nouvelle série</button></div>
+    <div class="setList" id="q-list"></div>
+    <div id="q-edit" hidden style="display:flex;flex-direction:column;gap:12px"></div>
+  </section>
+
+  <!-- CLASSE -->
+  <section class="panel" id="v-class" hidden>
+    <div class="row"><h2 style="flex:1">Ma classe</h2><button class="btn solid" id="c-save">Enregistrer</button></div>
+    <div class="row"><label for="c-name">Nom de la classe</label><input id="c-name" placeholder="10LC"></div>
+    <p class="note" style="margin:0">Chaque élève garde toujours la même carte. Écris le prénom en face du numéro de sa carte ; laisse vide les cartes non distribuées.</p>
+    <div class="roster" id="c-roster"></div>
+    <h3>Sauvegarde</h3>
+    <p class="note" style="margin:0">Tout (classe, séries, résultats) est enregistré dans le navigateur de cet ordinateur. Fais une sauvegarde de temps en temps ; elle sert aussi à tout transférer sur un autre ordinateur.</p>
+    <div class="row"><button class="btn" id="c-backup">Télécharger une sauvegarde</button><label class="btn ghost" for="c-restore" style="display:inline-flex;align-items:center;position:relative">Restaurer une sauvegarde<input type="file" id="c-restore" accept=".json,application/json" style="position:absolute;inset:0;opacity:0;width:100%"></label></div>
+  </section>
+
+  <!-- RÉSULTATS -->
+  <section class="panel" id="v-res" hidden>
+    <div class="row">
+      <select id="r-sess" aria-label="Séance"></select>
+      <button class="btn" id="r-csv">Exporter en CSV</button>
+      <button class="btn danger" id="r-del" style="margin-left:auto">Supprimer cette séance</button>
+    </div>
+    <div id="r-confirm" class="note" hidden></div>
+    <div id="r-sum" class="muted"></div>
+    <div class="tbl"><table id="r-tbl"></table></div>
+    <p class="muted" id="r-remote" hidden style="margin:0">Sur le téléphone relié, seule la séance en cours s'affiche : l'historique complet est sur l'ordinateur.</p>
+    <h3>Bilan par élève, toutes séances</h3>
+    <div class="tbl"><table id="r-all"></table></div>
+  </section>
+</div>
+
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js" onerror="var x=document.createElement('script');x.src='https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';document.head.appendChild(x)"></script>
+<script id="det">
+/* Détecteur de cartes (marqueurs ArUco 4x4, dictionnaire 4X4_50).
+   detect(gray, w, h) -> [{id, answer:'A'|'B'|'C'|'D', corners, center}] */
+var CardDetector = (function () {
+  var CODES = [46386, 3994, 13101, 39238, 21662, 31181, 40494, 50418, 65242, 53078, 63889, 4519, 3767, 10767, 9393, 9790, 18021, 26112, 27742, 30383, 34443, 45099, 52437, 56706, 65095, 38001, 44260, 42324, 8483, 13423, 17429, 22450, 40655, 61643, 2222, 2345, 6261, 1279, 3574, 7258, 5912, 10792, 12940, 14514, 9448, 12011, 11583, 19300, 20526, 20499];
+
+  function integral(g, w, h) {
+    var I = new Float64Array((w + 1) * (h + 1));
+    for (var y = 0; y < h; y++) {
+      var row = 0;
+      for (var x = 0; x < w; x++) {
+        row += g[y * w + x];
+        I[(y + 1) * (w + 1) + x + 1] = I[y * (w + 1) + x + 1] + row;
+      }
+    }
+    return I;
+  }
+
+  // 1 = sombre (encre), 0 = clair
+  function threshold(g, w, h) {
+    var I = integral(g, w, h), r = Math.max(7, Math.round(Math.min(w, h) / 40)), out = new Uint8Array(w * h), W = w + 1;
+    for (var y = 0; y < h; y++) {
+      var y0 = Math.max(0, y - r), y1 = Math.min(h, y + r + 1);
+      for (var x = 0; x < w; x++) {
+        var x0 = Math.max(0, x - r), x1 = Math.min(w, x + r + 1);
+        var s = I[y1 * W + x1] - I[y0 * W + x1] - I[y1 * W + x0] + I[y0 * W + x0];
+        var m = s / ((x1 - x0) * (y1 - y0));
+        out[y * w + x] = g[y * w + x] < m - 7 ? 1 : 0;
+      }
+    }
+    return out;
+  }
+
+  function components(bin, w, h, minPix) {
+    var lab = new Int32Array(w * h), comps = [], stack = new Int32Array(w * h), n = 0;
+    for (var i = 0; i < w * h; i++) {
+      if (!bin[i] || lab[i]) continue;
+      n++;
+      var sp = 0; stack[sp++] = i; lab[i] = n;
+      var cnt = 0, minx = w, maxx = 0, miny = h, maxy = 0, rowsL = {}, rowsR = {};
+      while (sp) {
+        var p = stack[--sp], px = p % w, py = (p - px) / w; cnt++;
+        if (px < minx) minx = px; if (px > maxx) maxx = px; if (py < miny) miny = py; if (py > maxy) maxy = py;
+        if (rowsL[py] === undefined || px < rowsL[py]) rowsL[py] = px;
+        if (rowsR[py] === undefined || px > rowsR[py]) rowsR[py] = px;
+        if (px > 0 && bin[p - 1] && !lab[p - 1]) { lab[p - 1] = n; stack[sp++] = p - 1; }
+        if (px < w - 1 && bin[p + 1] && !lab[p + 1]) { lab[p + 1] = n; stack[sp++] = p + 1; }
+        if (py > 0 && bin[p - w] && !lab[p - w]) { lab[p - w] = n; stack[sp++] = p - w; }
+        if (py < h - 1 && bin[p + w] && !lab[p + w]) { lab[p + w] = n; stack[sp++] = p + w; }
+      }
+      var bw = maxx - minx + 1, bh = maxy - miny + 1;
+      if (cnt < minPix || bw < 12 || bh < 12) continue;
+      if (bw > w * 0.6 || bh > h * 0.6) continue;
+      if (bw / bh > 3.5 || bh / bw > 3.5) continue;
+      var pts = [];
+      for (var k in rowsL) { pts.push([rowsL[k], +k]); pts.push([rowsR[k] + 1, +k]); }
+      comps.push({ cnt: cnt, pts: pts, bw: bw, bh: bh });
+    }
+    return comps;
+  }
+
+  function hull(P) {
+    P.sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+    function cr(o, a, b) { return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]); }
+    var lo = [], up = [], i;
+    for (i = 0; i < P.length; i++) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], P[i]) <= 0) lo.pop(); lo.push(P[i]); }
+    for (i = P.length - 1; i >= 0; i--) { while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], P[i]) <= 0) up.pop(); up.push(P[i]); }
+    up.pop(); lo.pop();
+    return lo.concat(up);
+  }
+  function area(Q) { var s = 0; for (var i = 0; i < Q.length; i++) { var a = Q[i], b = Q[(i + 1) % Q.length]; s += a[0] * b[1] - b[0] * a[1]; } return Math.abs(s) / 2; }
+
+  // meilleur quadrilatère inscrit dans l'enveloppe (sommets de l'enveloppe)
+  function quad(H) {
+    var n = H.length, i, j, best = 0, a = 0, c = 0;
+    for (i = 0; i < n; i++) for (j = i + 1; j < n; j++) {
+      var dx = H[i][0] - H[j][0], dy = H[i][1] - H[j][1], d = dx * dx + dy * dy;
+      if (d > best) { best = d; a = i; c = j; }
+    }
+    function far(from, to) {
+      var bi = -1, bd = -1, A = H[a], C = H[c];
+      for (var k = (from + 1) % n; k !== to; k = (k + 1) % n) {
+        var d = Math.abs((C[0] - A[0]) * (A[1] - H[k][1]) - (A[0] - H[k][0]) * (C[1] - A[1]));
+        if (d > bd) { bd = d; bi = k; }
+      }
+      return bi;
+    }
+    var b = far(a, c), d = far(c, a);
+    if (b < 0 || d < 0) return null;
+    // affinage : alterner l'optimisation de chaque sommet
+    var idx = [a, b, c, d];
+    for (var it = 0; it < 3; it++) for (var s = 0; s < 4; s++) {
+      var prev = idx[(s + 3) % 4], next = idx[(s + 1) % 4], bestA = -1, bestK = idx[s];
+      for (var k = (prev + 1) % n; k !== next; k = (k + 1) % n) {
+        var t = idx.slice(); t[s] = k;
+        var ar = area(t.map(function (q) { return H[q]; }));
+        if (ar > bestA) { bestA = ar; bestK = k; }
+      }
+      idx[s] = bestK;
+    }
+    return idx.map(function (q) { return H[q]; });
+  }
+
+  // homographie carré unité -> quadrilatère
+  function homog(Q) {
+    var x0 = Q[0][0], y0 = Q[0][1], x1 = Q[1][0], y1 = Q[1][1], x2 = Q[2][0], y2 = Q[2][1], x3 = Q[3][0], y3 = Q[3][1];
+    var dx1 = x1 - x2, dx2 = x3 - x2, dx3 = x0 - x1 + x2 - x3, dy1 = y1 - y2, dy2 = y3 - y2, dy3 = y0 - y1 + y2 - y3;
+    var den = dx1 * dy2 - dx2 * dy1, g = (dx3 * dy2 - dx2 * dy3) / den, hh = (dx1 * dy3 - dx3 * dy1) / den;
+    return [x1 - x0 + g * x1, x3 - x0 + hh * x3, x0, y1 - y0 + g * y1, y3 - y0 + hh * y3, y0, g, hh];
+  }
+  function map(Hm, u, v) { var z = Hm[6] * u + Hm[7] * v + 1; return [(Hm[0] * u + Hm[1] * v + Hm[2]) / z, (Hm[3] * u + Hm[4] * v + Hm[5]) / z]; }
+
+  function sample(g, w, h, Hm, u, v) {
+    var p = map(Hm, u, v), x = p[0] - 0.5, y = p[1] - 0.5;
+    var xi = Math.floor(x), yi = Math.floor(y);
+    if (xi < 0 || yi < 0 || xi >= w - 1 || yi >= h - 1) return -1;
+    var fx = x - xi, fy = y - yi, i = yi * w + xi;
+    return g[i] * (1 - fx) * (1 - fy) + g[i + 1] * fx * (1 - fy) + g[i + w] * (1 - fx) * fy + g[i + w + 1] * fx * fy;
+  }
+
+  function rot90(bits) { // rotation horaire d'une grille 4x4 (tableau de 16)
+    var r = new Array(16);
+    for (var y = 0; y < 4; y++) for (var x = 0; x < 4; x++) r[x * 4 + (3 - y)] = bits[y * 4 + x];
+    return r;
+  }
+  function code(bits) { var c = 0; for (var i = 0; i < 16; i++) c = c * 2 + bits[i]; return c; }
+  function pop(x) { var n = 0; while (x) { n += x & 1; x >>>= 1; } return n; }
+
+  function readQuad(g, w, h, Q) {
+    var Hm = homog(Q), cells = [], mn = 255, mx = 0;
+    for (var cy = 0; cy < 6; cy++) for (var cx = 0; cx < 6; cx++) {
+      var s = 0, k = 0;
+      for (var sy = 0; sy < 3; sy++) for (var sx = 0; sx < 3; sx++) {
+        var v = sample(g, w, h, Hm, (cx + 0.3 + sx * 0.2) / 6, (cy + 0.3 + sy * 0.2) / 6);
+        if (v < 0) return null; s += v; k++;
+      }
+      s /= k; cells.push(s); if (s < mn) mn = s; if (s > mx) mx = s;
+    }
+    if (mx - mn < 30) return null;
+    // seuil d'Otsu sur les 36 cases
+    var sorted = cells.slice().sort(function (a, b) { return a - b; }), bestT = (mn + mx) / 2, bestV = -1;
+    for (var t = 1; t < 36; t++) {
+      var m0 = 0, m1 = 0, i;
+      for (i = 0; i < t; i++) m0 += sorted[i]; for (i = t; i < 36; i++) m1 += sorted[i];
+      m0 /= t; m1 /= 36 - t;
+      var v2 = t * (36 - t) * (m1 - m0) * (m1 - m0);
+      if (v2 > bestV) { bestV = v2; bestT = (sorted[t - 1] + sorted[t]) / 2; }
+    }
+    var badBorder = 0;
+    for (var yb = 0; yb < 6; yb++) for (var xb = 0; xb < 6; xb++) {
+      if (xb > 0 && xb < 5 && yb > 0 && yb < 5) continue;
+      if (cells[yb * 6 + xb] > bestT) badBorder++;
+    }
+    if (badBorder > 1) return null;
+    var bits = [];
+    for (var y = 1; y < 5; y++) for (var x = 1; x < 5; x++) bits.push(cells[y * 6 + x] > bestT ? 1 : 0);
+    var best = null;
+    for (var r = 0; r < 4; r++) {
+      var c = code(bits);
+      for (var id = 0; id < CODES.length; id++) {
+        var dist = pop(c ^ CODES[id]);
+        if (dist <= 1 && (!best || dist < best.dist)) best = { id: id, rot: r, dist: dist };
+      }
+      bits = rot90(bits);
+    }
+    return best;
+  }
+
+  function detect(g, w, h) {
+    var bin = threshold(g, w, h);
+    var minPix = Math.max(80, (w * h) / 40000);
+    var comps = components(bin, w, h, minPix), found = {};
+    comps.forEach(function (cp) {
+      if (cp.pts.length < 8) return;
+      var H = hull(cp.pts.slice());
+      if (H.length < 4) return;
+      var Q = quad(H);
+      if (!Q) return;
+      var qa = area(Q), ha = area(H);
+      if (qa < 150 || qa / ha < 0.85) return;
+      if (cp.cnt / qa < 0.12) return;
+      // côtés pas trop déséquilibrés
+      var L = [];
+      for (var i = 0; i < 4; i++) { var a = Q[i], b = Q[(i + 1) % 4]; L.push(Math.hypot(a[0] - b[0], a[1] - b[1])); }
+      if (Math.min.apply(null, L) / Math.max.apply(null, L) < 0.3) return;
+      // ordre horaire à l'écran (y vers le bas)
+      var s = 0; for (i = 0; i < 4; i++) { var p = Q[i], q = Q[(i + 1) % 4]; s += p[0] * q[1] - q[0] * p[1]; }
+      if (s < 0) Q = [Q[0], Q[3], Q[2], Q[1]];
+      var res = readQuad(g, w, h, Q);
+      if (!res) return;
+      // la grille lue a été tournée res.rot fois (horaire) pour coller au code :
+      // le bord "haut" du marqueur est donc l'arête qui part du coin Q[res.rot]
+      var k = (4 - res.rot) % 4, t0 = Q[k % 4], t1 = Q[(k + 1) % 4];
+      var cx = (Q[0][0] + Q[1][0] + Q[2][0] + Q[3][0]) / 4, cy = (Q[0][1] + Q[1][1] + Q[2][1] + Q[3][1]) / 4;
+      var ux = (t0[0] + t1[0]) / 2 - cx, uy = (t0[1] + t1[1]) / 2 - cy;
+      var ans;
+      if (Math.abs(uy) >= Math.abs(ux)) ans = uy < 0 ? 'A' : 'C';
+      else ans = ux < 0 ? 'B' : 'D';
+      var prev = found[res.id];
+      if (!prev || res.dist < prev.dist || (res.dist === prev.dist && qa > prev.area))
+        found[res.id] = { id: res.id, answer: ans, corners: Q, center: [cx, cy], dist: res.dist, area: qa };
+    });
+    return Object.keys(found).map(function (k) { return found[k]; });
+  }
+
+  return { detect: detect, CODES: CODES };
+})();
+
+</script>
+<script>
+(function(){
+var NCARDS=40, LET='ABCD';
+var $=function(s){return document.querySelector(s)}, $$=function(s){return Array.prototype.slice.call(document.querySelectorAll(s))};
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+/* notation : 2^5, 2^{10}, [3/4] (fraction superposée) */
+function fmt(s){
+  var h=esc(s);
+  h=h.replace(/\[([^\[\]\/]+)\/([^\[\]]+)\]/g,function(_,a,b){return '<span class="frac"><span>'+a.trim()+'</span><span>'+b.trim()+'</span></span>'});
+  h=h.replace(/\^\{([^}]*)\}/g,'<sup>$1</sup>').replace(/\^(−?-?[0-9A-Za-zn]+)/g,'<sup>$1</sup>');
+  return h;
+}
+function toast(t){var d=document.createElement('div');d.className='toast';d.textContent=t;document.body.appendChild(d);setTimeout(function(){d.remove()},2200)}
+function uid(p){return p+Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
+
+/* ---------- stockage (ce navigateur) et liaison téléphone ↔ ordinateur ---------- */
+var S={classe:{name:'',students:{}},sets:{},sessions:{},live:{}};
+function clone(o){return o==null?o:JSON.parse(JSON.stringify(o))}
+function lsGet(){try{var v=localStorage.getItem('cr-data');return v?JSON.parse(v):null}catch(e){return null}}
+var lsWarned=false;
+function lsPut(){if(mode==='remote')return;try{localStorage.setItem('cr-data',JSON.stringify(S))}catch(e){if(!lsWarned){lsWarned=true;toast('Mémoire du navigateur pleine : télécharge une sauvegarde.')}}}
+function lsGetK(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function lsSetK(k,v){try{if(v==null)localStorage.removeItem(k);else localStorage.setItem(k,v)}catch(e){}}
+function render(){renderProj();renderScan();renderSets();renderClass();renderRes();renderLink()}
+var rq=0;function rerender(){if(rq)return;rq=requestAnimationFrame(function(){rq=0;render()})}
+function applyWrite(path,data){var p=path.split('/');
+  if(p[0]==='config'&&data)S.classe=data;else if(p[0]==='live')S.live=data||{};
+  else if((p[0]==='sets'||p[0]==='sessions')&&p[1]){if(data==null)delete S[p[0]][p[1]];else S[p[0]][p[1]]=data}}
+function writeDoc(path,data){data=clone(data);applyWrite(path,data);if(mode==='remote')rsend({t:'w',path:path,data:data});else{lsPut();broadcast()}rerender();return Promise.resolve()}
+function delDoc(path){return writeDoc(path,null)}
+function mergeAns(id,key,map){var s=S.sessions[id];if(!s)return;s.answers=s.answers||{};var cur=s.answers[key]=s.answers[key]||{};for(var n in map){if(map[n]==null)delete cur[n];else cur[n]=map[n]}}
+function deepMerge(a,b){for(var k in b){if(b[k]&&typeof b[k]==='object'&&!Array.isArray(b[k])){a[k]=deepMerge(a[k]&&typeof a[k]==='object'?a[k]:{},b[k])}else a[k]=b[k]}return a}
+
+/* liaison : l'ordinateur « héberge », le téléphone s'y relie avec un code à 4 chiffres */
+var PREFIX='cartes-rep-wlb-',mode='host',peer=null,conns=[],hostConn=null,outbox=[],linkMsg='',myCode=null,remoteCode=null,peerReady=false;
+function code4(){return String(Math.floor(1000+Math.random()*9000))}
+function snapshotFor(){var L=S.live&&S.live.sessionId,ss={};if(L&&S.sessions[L])ss[L]=S.sessions[L];return {classe:S.classe,live:S.live,sessions:ss,sets:S.sets}}
+function broadcast(){if(mode!=='host')return;var m={t:'state',S:snapshotFor()};conns.forEach(function(c){if(c.open)try{c.send(m)}catch(e){}})}
+function rsend(m){if(hostConn&&hostConn.open){try{hostConn.send(m);return}catch(e){}}outbox.push(m)}
+function whenPeer(fn){if(window.Peer){fn();return}var n=0,t=setInterval(function(){if(window.Peer){clearInterval(t);fn()}else if(++n>40){clearInterval(t);linkMsg='Liaison indisponible : le réseau bloque peut-être le service (unpkg/jsdelivr).';rerender()}},250)}
+function startHost(){
+  myCode=lsGetK('cr-code');if(!myCode){myCode=code4();lsSetK('cr-code',myCode)}
+  whenPeer(function(){var tries=0;
+    (function open(){if(mode!=='host')return;
+      peer=new Peer(PREFIX+myCode,{debug:0});peerReady=false;
+      peer.on('open',function(){peerReady=true;linkMsg='';rerender()});
+      peer.on('connection',function(c){conns.push(c);
+        c.on('open',function(){try{c.send({t:'state',S:snapshotFor()})}catch(e){}rerender()});
+        c.on('data',function(m){onHostData(c,m)});
+        c.on('close',function(){conns=conns.filter(function(x){return x!==c});rerender()});
+        c.on('error',function(){})});
+      peer.on('error',function(e){
+        if(e&&e.type==='unavailable-id'){try{peer.destroy()}catch(x){}if(++tries<4){linkMsg='Code '+myCode+' déjà pris (autre onglet ouvert ?), nouvel essai…';rerender();setTimeout(open,5000)}else{myCode=code4();lsSetK('cr-code',myCode);tries=0;open()}}
+        else if(e&&(e.type==='network'||e.type==='server-error'||e.type==='socket-error')){linkMsg='Liaison interrompue, reconnexion…';peerReady=false;rerender()}
+      });
+      peer.on('disconnected',function(){peerReady=false;rerender();setTimeout(function(){try{if(!peer.destroyed)peer.reconnect()}catch(x){}},2000)});
+    })();
+  });
+}
+function onHostData(c,m){if(!m||typeof m!=='object')return;
+  if(m.t==='w'&&typeof m.path==='string'){applyWrite(m.path,m.data);lsPut();broadcast();rerender()}
+  else if(m.t==='ans'&&m.id&&m.key&&m.map){mergeAns(m.id,m.key,m.map);lsPut();broadcast();rerender()}
+  else if(m.t==='hello'){try{c.send({t:'state',S:snapshotFor()})}catch(e){}}}
+function startRemote(code){
+  code=String(code).replace(/\D/g,'');if(code.length!==4){toast('Le code a 4 chiffres.');return}
+  if(code===myCode&&mode==='host'){toast('C\'est le code de cet appareil : tape-le sur le téléphone.');return}
+  mode='remote';remoteCode=code;lsSetK('cr-remote',code);
+  if(peer){try{peer.destroy()}catch(e){}}peer=null;conns=[];hostConn=null;
+  S={classe:{name:'',students:{}},sets:{},sessions:{},live:{}};
+  linkMsg='Connexion à l\'ordinateur '+code+'…';rerender();
+  whenPeer(function(){
+    peer=new Peer({debug:0});
+    peer.on('open',connect);
+    peer.on('error',function(e){if(mode!=='remote')return;
+      if(e&&e.type==='peer-unavailable'){linkMsg='Ordinateur '+code+' introuvable : la page est-elle ouverte sur l\'ordinateur ? Nouvel essai…';rerender();setTimeout(connect,4000)}
+      else{linkMsg='Liaison interrompue, reconnexion…';rerender()}});
+    peer.on('disconnected',function(){setTimeout(function(){try{if(!peer.destroyed)peer.reconnect()}catch(x){}},2000)});
+  });
+  function connect(){if(mode!=='remote'||!peer||peer.destroyed)return;
+    var c=peer.connect(PREFIX+code,{reliable:true,serialization:'json'});hostConn=c;
+    c.on('open',function(){linkMsg='';var o=outbox;outbox=[];o.forEach(function(m){try{c.send(m)}catch(e){}});try{c.send({t:'hello'})}catch(e){}rerender()});
+    c.on('data',function(m){if(m&&m.t==='state'&&m.S){S.classe=m.S.classe||{name:'',students:{}};S.live=m.S.live||{};S.sets=m.S.sets||{};for(var k in m.S.sessions)S.sessions[k]=m.S.sessions[k];rerender()}});
+    c.on('close',function(){if(mode!=='remote'||hostConn!==c)return;linkMsg='Liaison perdue, reconnexion…';rerender();setTimeout(connect,2500)});
+    c.on('error',function(){});
+  }
+}
+function stopRemote(){mode='host';remoteCode=null;lsSetK('cr-remote',null);if(peer)try{peer.destroy()}catch(e){}peer=null;hostConn=null;outbox=[];loadLocal();startHost();rerender()}
+function loadLocal(){S={classe:{name:'',students:{}},sets:{},sessions:{},live:{}};var v=lsGet();if(v)S=deepMerge(S,v);if(!Object.keys(S.sets).length){S.sets['set-puissances-l1']=clone(SEED);lsPut()}}
+function renderLink(){var el=$('#link');
+  if(mode==='remote'){el.className='link'+(hostConn&&hostConn.open?' ok':'');el.innerHTML=hostConn&&hostConn.open?'Relié à l\'ordinateur <b>'+esc(remoteCode)+'</b>':esc(linkMsg||'Connexion…')}
+  else{var n=conns.filter(function(c){return c.open}).length;el.className='link'+(n?' ok':'');
+    el.innerHTML=peerReady?('Code téléphone <b>'+esc(myCode)+'</b>'+(n?' · '+n+' relié'+(n>1?'s':''):'')):esc(linkMsg||'Préparation de la liaison…')}
+  var box=$('#s-conn');
+  if(mode==='remote')box.innerHTML='<div class="conn"><span class="muted">'+(hostConn&&hostConn.open?'Relié à l\'ordinateur '+esc(remoteCode)+'.':esc(linkMsg))+'</span><button class="mini" id="s-unlink">Se déconnecter</button></div>';
+  else box.innerHTML='<div class="note conn"><span style="flex:1;min-width:180px">Sur le téléphone : tape le code affiché sur l\'ordinateur du projecteur.</span><input id="s-code" inputmode="numeric" maxlength="4" placeholder="0000" aria-label="Code de l\'ordinateur"><button class="btn" id="s-link">Relier</button></div>';
+  var b=$('#s-link');if(b)b.onclick=function(){startRemote($('#s-code').value)};
+  var u=$('#s-unlink');if(u)u.onclick=stopRemote;
+  var inp=$('#s-code');if(inp)inp.onkeydown=function(e){if(e.key==='Enter')startRemote(inp.value)};
+}
+
+var SEED={title:'Leçon 1 · Les puissances (Défi éclair)',order:1,questions:[
+ {q:'2^5 = ?',c:['10','25','32','64'],a:2,e:"2 · 2 · 2 · 2 · 2 = 32. Ce n'est pas 2 · 5 !"},
+ {q:'(−3)^3 = ?',c:['−27','27','−9','9'],a:0,e:'(−3) · (−3) · (−3) = −27 : exposant impair, résultat négatif.'},
+ {q:'100^0 = ?',c:['0','1','100','10'],a:1,e:'Tout nombre non nul puissance 0 vaut 1.'},
+ {q:'−3^2 = ?',c:['9','−9','6','−6'],a:1,e:'Sans parenthèses : −(3 · 3) = −9.'},
+ {q:'(−2)^4 = ?',c:['−16','−8','8','16'],a:3,e:'Exposant pair : résultat positif. (−2) · (−2) · (−2) · (−2) = 16.'},
+ {q:"5 · 5 · 5 · 5 s'écrit…",c:['4 · 5','20','5^4','4^5'],a:2,e:'4 facteurs égaux à 5 : 5^4.'}
+]};
+
+function boot(){
+  var t=setTimeout(function(){useLocal('La base partagée ne répond pas : les données restent dans ce navigateur.')},11000);
+  if(!window.claude||!window.claude.use){clearTimeout(t);useLocal('Ouvre cette page depuis claude.ai (connecté) pour synchroniser projecteur et téléphone. En attendant, les données restent dans ce navigateur.');return}
+  window.claude.use('db').then(function(d){
+    clearTimeout(t);
+    if(!d){useLocal('Synchronisation indisponible ici (non connecté ?) : les données restent dans ce navigateur.');return}
+    db=d;
+    db.doc('config/classe').onSnapshot(function(s){S.classe=s.exists?clone(s.data()):{name:'',students:{}};rerender()});
+    db.collection('sets').onSnapshot(function(q){S.sets={};q.docs.forEach(function(x){S.sets[x.id]=clone(x.data())});rerender()});
+    db.collection('sessions').onSnapshot(function(q){S.sessions={};q.docs.forEach(function(x){S.sessions[x.id]=pending[x.id]||clone(x.data())});rerender()});
+    db.doc('live/state').onSnapshot(function(s){S.live=s.exists?clone(s.data()):{};rerender()});
+  }).catch(function(){clearTimeout(t);useLocal('Synchronisation indisponible : les données restent dans ce navigateur.')});
+}
+var localUsed=false;
+function useLocal(msg){
+  if(db||localUsed)return;localUsed=true;
+  var v=lsGet();if(v)S=deepMerge(S,v);
+  if(!Object.keys(S.sets).length){S.sets['set-puissances-l1']=SEED;lsPut()}
+  var n=$('#storeNote');n.textContent=msg;n.hidden=false;render();
+}
+
+/* ---------- helpers ---------- */
+function setsSorted(){return Object.keys(S.sets).map(function(k){return {id:k,s:S.sets[k]}}).sort(function(a,b){return (a.s.order||0)-(b.s.order||0)||String(a.s.title).localeCompare(b.s.title)})}
+function liveSession(){var id=S.live&&S.live.sessionId;return id&&S.sessions[id]?{id:id,s:S.sessions[id]}:null}
+function liveQ(){var L=liveSession();if(!L)return null;var qs=L.s.questions||[];var i=Math.max(0,Math.min(qs.length-1,S.live.q||0));return {L:L,i:i,Q:qs[i],qs:qs}}
+function answersFor(L,i){return (L.s.answers&&L.s.answers['q'+i])||{}}
+function named(){var st=(S.classe&&S.classe.students)||{},out=[];for(var n=1;n<=NCARDS;n++)if(st[n]&&String(st[n]).trim())out.push(n);return out}
+function nameOf(n){var st=(S.classe&&S.classe.students)||{};return st[n]&&String(st[n]).trim()||('Carte '+n)}
+function setLive(p){S.live=Object.assign({},S.live,p);rerender();return writeDoc('live/state',S.live,false)}
+
+/* ---------- onglets ---------- */
+var view='proj';
+function show(v){view=v;$$('.tabs button').forEach(function(b){b.setAttribute('aria-selected',b.getAttribute('data-v')===v?'true':'false')});
+  ['proj','scan','sets','class','res'].forEach(function(k){$('#v-'+k).hidden=k!==v});if(v==='proj')fit();
+  try{localStorage.setItem('cr-view',v)}catch(e){}}
+$$('.tabs button').forEach(function(b){b.onclick=function(){show(b.getAttribute('data-v'))}});
+var hv=(location.hash||'').slice(1);var sv=null;try{sv=localStorage.getItem('cr-view')}catch(e){}
+show(['proj','scan','sets','class','res'].indexOf(hv)>=0?hv:(sv&&['proj','scan','sets','class','res'].indexOf(sv)>=0?sv:(matchMedia('(max-width:700px)').matches?'scan':'proj')));
+
+/* ---------- PROJETER ---------- */
+function fit(){var box=$('#stageBox'),st=$('#stage');var fs=document.fullscreenElement===box;var W=box.clientWidth,H=box.clientHeight;if(!W)return;var k=fs?Math.min(W/1280,H/720):W/1280;st.style.transform='scale('+k+')';st.style.left=fs?((W-1280*k)/2)+'px':'0';st.style.top=fs?((H-720*k)/2)+'px':'0'}
+window.addEventListener('resize',fit);document.addEventListener('fullscreenchange',function(){setTimeout(fit,50)});
+var projSeen={};
+function renderProj(){
+  var sel=$('#p-set'),cur=sel.value,list=setsSorted();
+  sel.innerHTML=list.map(function(x){return '<option value="'+esc(x.id)+'">'+esc(x.s.title)+' ('+(x.s.questions||[]).length+' q.)</option>'}).join('')||'<option value="">Aucune série</option>';
+  if(cur&&S.sets[cur])sel.value=cur;else if(liveSession()&&S.sets[liveSession().s.setId])sel.value=liveSession().s.setId;
+  var st=$('#stage'),lq=liveQ();
+  $('#p-prev').disabled=$('#p-next').disabled=$('#p-reveal').disabled=!lq;
+  if(!lq||!lq.Q){$('#p-info').textContent='';st.innerHTML='<div class="s-top"><span class="s-tag">Cartes-réponses</span></div><div class="s-empty"><b>Prêts ? Sortez vos cartes !</b><div style="font-size:28px;font-weight:800;color:#4A4858">Choisis une série puis « Lancer la série ».</div></div>';fit();return}
+  var Q=lq.Q,ans=answersFor(lq.L,lq.i),rev=!!S.live.reveal,cnt=[0,0,0,0],tot=0;
+  for(var k in ans){var x=LET.indexOf(ans[k]);if(x>=0){cnt[x]++;tot++}}
+  $('#p-info').textContent='Séance en cours : '+(lq.L.s.title||'');
+  $('#p-reveal').textContent=rev?'Masquer la réponse':'Révéler la réponse';
+  var roster=named(),nums=roster.slice();
+  if(!nums.length)for(var c=1;c<=NCARDS;c++)nums.push(c);
+  Object.keys(ans).forEach(function(n){n=+n;if(nums.indexOf(n)<0)nums.push(n)});nums.sort(function(a,b){return a-b});
+  var key=lq.L.id+':'+lq.i,seen=projSeen[key]||{},fresh={};
+  if(projSeen[key])for(var n0 in ans)if(!seen[n0])fresh[n0]=1;
+  projSeen={};projSeen[key]=Object.assign({},ans);
+  var h='<div class="s-top"><span class="s-tag">'+esc(lq.L.s.title||'')+' · question '+(lq.i+1)+' / '+lq.qs.length+'</span><span class="s-hint">Lève ta carte : la bonne lettre en haut</span></div>';
+  h+='<div class="s-q">'+fmt(Q.q)+'</div><div class="s-grid">';
+  for(var i=0;i<4;i++){var cls='s-a'+(rev?(i===Q.a?' good':' dim'):'');var pc=tot?Math.round(cnt[i]*100/tot):0;
+    h+='<div class="'+cls+'"><div class="bar" style="width:'+(rev?pc:0)+'%"></div><span class="L">'+LET[i]+'</span><span class="T">'+fmt(Q.c[i])+'</span>'+(rev?'<span class="N">'+cnt[i]+'</span>':'')+'</div>'}
+  h+='</div><div class="s-foot"><div class="s-exp">'+(rev?fmt(Q.e||''):(tot?'Numéro en jaune : tu peux baisser ta carte.':''))+'</div><span class="s-count"><b>'+tot+'</b>'+(roster.length?' / '+roster.length:'')+' carte'+(tot>1?'s':'')+' lue'+(tot>1?'s':'')+'</span></div>';
+  h+='<div class="s-chips">'+nums.map(function(n){return '<span class="'+(ans[n]?'on':'')+(fresh[n]?' new':'')+'">'+n+'</span>'}).join('')+'</div>';
+  st.innerHTML=h;fit();
+}
+$('#p-start').onclick=function(){var id=$('#p-set').value,set=S.sets[id];if(!set||!(set.questions||[]).length){toast('Cette série est vide.');return}
+  var sid=uid('s'),d=new Date();var sess={setId:id,title:set.title,questions:set.questions,startedAt:d.toISOString(),answers:{}};
+  S.sessions[sid]=sess;writeDoc('sessions/'+sid,sess,false).then(function(){return setLive({sessionId:sid,q:0,reveal:false})});toast('Série lancée');};
+function go(dl){var lq=liveQ();if(!lq)return;var n=Math.max(0,Math.min(lq.qs.length-1,lq.i+dl));if(n!==lq.i)setLive({q:n,reveal:false})}
+function rev(){var lq=liveQ();if(!lq)return;setLive({reveal:!S.live.reveal})}
+$('#p-prev').onclick=function(){go(-1)};$('#p-next').onclick=function(){go(1)};$('#p-reveal').onclick=rev;
+$('#p-full').onclick=function(){var b=$('#stageBox');if(b.requestFullscreen)b.requestFullscreen().catch(function(){toast('Plein écran indisponible ici')});else toast('Plein écran indisponible ici')};
+document.addEventListener('keydown',function(e){if(view!=='proj'||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
+  if(e.key==='ArrowRight'||e.key==='PageDown'){go(1);e.preventDefault()}else if(e.key==='ArrowLeft'||e.key==='PageUp'){go(-1);e.preventDefault()}else if(e.key===' '){rev();e.preventDefault()}});
+
+/* ---------- SCANNER (caméra en continu) ---------- */
+function qkey(){var lq=liveQ();return lq?lq.L.id+':'+lq.i:null}
+function renderScan(){
+  var lq=liveQ(),box=$('#s-live');
+  $('#s-prev').disabled=$('#s-next').disabled=$('#s-reveal').disabled=!lq;$('#s-go').disabled=!lq;
+  if(!lq||!lq.Q){box.innerHTML='<div class="q">Aucune série en cours</div><div class="muted">Lance une série depuis l\'onglet Projeter (sur l\'ordinateur ou ici).</div>';$('#s-chips').innerHTML='';$('#s-count').textContent='';return}
+  var Q=lq.Q,ans=answersFor(lq.L,lq.i);
+  box.innerHTML='<div class="muted" style="font-weight:800">'+esc(lq.L.s.title)+' · question '+(lq.i+1)+' / '+lq.qs.length+'</div><div class="q">'+fmt(Q.q)+'</div><div class="muted">Bonne réponse : <b style="color:var(--good)">'+LET[Q.a]+'</b> ('+fmt(Q.c[Q.a])+')</div>';
+  $('#s-reveal').textContent=S.live.reveal?'Masquer au projecteur':'Révéler au projecteur';
+  $('#s-go').textContent=cam.stream?'Scanner la question '+(lq.i+1):'Démarrer le scan';
+  var roster=named(),nums=roster.slice();Object.keys(ans).forEach(function(k){k=+k;if(nums.indexOf(k)<0)nums.push(k)});nums.sort(function(a,b){return a-b});
+  var ok=0,tot=0;
+  $('#s-chips').innerHTML=nums.map(function(n){var a=ans[n],c='chip';if(a){tot++;if(LET.indexOf(a)===Q.a){ok++;c+=' ok'}else c+=' ko'}
+    return '<button class="'+c+'" data-n="'+n+'"><span class="n">'+n+'</span><span class="nm">'+esc(nameOf(n))+'</span><span class="a">'+(a||'·')+'</span></button>'}).join('')||'<span class="muted">Aucune réponse pour l\'instant.</span>';
+  $('#s-count').textContent=tot+(roster.length?' / '+roster.length:'')+' réponses · '+ok+' justes';
+  $$('#s-chips .chip').forEach(function(b){b.onclick=function(){var n=b.getAttribute('data-n'),cur=ans[n]||'',nx=cur?LET.indexOf(cur)+1:0;var v=nx>3?null:LET[nx];var o={};o[n]=v;saveAnswers(lq,o)}});
+  if(cam.on&&cam.key!==qkey())camPause('Nouvelle question : touche « Scanner la question '+(lq.i+1)+' » quand les cartes sont levées.');
+}
+function saveAnswers(lq,map){var id=lq.L.id,key='q'+lq.i;mergeAns(id,key,map);
+  if(mode==='remote')rsend({t:'ans',id:id,key:key,map:map});else{lsPut();broadcast()}rerender()}
+$('#s-prev').onclick=function(){go(-1)};$('#s-next').onclick=function(){go(1)};$('#s-reveal').onclick=rev;
+function status(h){$('#s-status').innerHTML=h||''}
+
+/* détection dans un fil séparé pour que la vidéo reste fluide */
+var worker=null,wcb={},wid=0;
+try{var src=$('#det').textContent+'\nonmessage=function(e){var d=e.data;try{postMessage({k:d.k,found:CardDetector.detect(d.g,d.w,d.h)})}catch(x){postMessage({k:d.k,err:String(x)})}};';
+  worker=new Worker(URL.createObjectURL(new Blob([src],{type:'text/javascript'})));
+  worker.onmessage=function(e){var cb=wcb[e.data.k];delete wcb[e.data.k];if(cb)cb(e.data)};
+  worker.onerror=function(){worker=null};
+}catch(e){worker=null}
+function detectAsync(g,w,h){
+  if(!worker)return Promise.resolve(CardDetector.detect(g,w,h));
+  return new Promise(function(res){var k=++wid,t=setTimeout(function(){delete wcb[k];res([])},8000);
+    wcb[k]=function(d){clearTimeout(t);res(d.err?[]:d.found)};worker.postMessage({k:k,g:g,w:w,h:h},[g.buffer])})}
+
+var cam={on:false,stream:null,busy:false,cand:{},key:null,lock:null,fps:0,lastT:0};
+var vid=$('#s-video'),ov=$('#s-ov'),procCv=document.createElement('canvas'),procCx=procCv.getContext('2d',{willReadFrequently:true});
+function wake(){try{if(navigator.wakeLock)navigator.wakeLock.request('screen').then(function(l){cam.lock=l}).catch(function(){})}catch(e){}}
+function unwake(){try{if(cam.lock)cam.lock.release()}catch(e){}cam.lock=null}
+function camRun(){cam.on=true;cam.key=qkey();cam.cand={};$('#camBox').hidden=false;$('#camBox').classList.remove('paused');$('#s-go').hidden=true;$('#s-stop').hidden=false;wake();status('Scan en cours…');requestAnimationFrame(loop)}
+function camStart(){if(!liveQ()){toast('Lance d\'abord une série.');return}
+  if(cam.stream){camRun();return}
+  if(!window.isSecureContext||!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){status('La caméra n\'est pas accessible ici : ouvre la page depuis son adresse https (GitHub Pages) dans Chrome ou Safari.');return}
+  status('Ouverture de la caméra…');
+  navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}}})
+    .then(function(st){cam.stream=st;vid.srcObject=st;return vid.play()}).then(camRun)
+    .catch(function(e){status('Caméra refusée ou indisponible ('+esc(e&&e.name||e)+'). Autorise la caméra pour ce site dans les réglages du navigateur.')})}
+function camPause(msg){cam.on=false;$('#s-go').hidden=false;$('#s-stop').hidden=false;$('#camBox').classList.add('paused');unwake();if(msg)status(msg);renderScanBtn()}
+function camStop(){cam.on=false;if(cam.stream){cam.stream.getTracks().forEach(function(t){t.stop()});cam.stream=null;vid.srcObject=null}
+  $('#camBox').hidden=true;$('#s-go').hidden=false;$('#s-stop').hidden=true;unwake();status('Scan arrêté.');renderScanBtn()}
+function renderScanBtn(){var lq=liveQ();$('#s-go').textContent=cam.stream&&lq?'Scanner la question '+(lq.i+1):'Démarrer le scan'}
+$('#s-go').onclick=camStart;$('#s-stop').onclick=camStop;
+document.addEventListener('visibilitychange',function(){if(document.hidden&&cam.stream)camStop()});
+function loop(){if(!cam.on)return;
+  if(cam.key!==qkey())return;
+  if(!cam.busy&&vid.readyState>=2&&vid.videoWidth){cam.busy=true;
+    var vw=vid.videoWidth,vh=vid.videoHeight,k=Math.min(1,1600/Math.max(vw,vh)),w=Math.round(vw*k),h=Math.round(vh*k);
+    procCv.width=w;procCv.height=h;procCx.drawImage(vid,0,0,w,h);
+    var d=procCx.getImageData(0,0,w,h).data,g=new Uint8Array(w*h);for(var i=0,j=0;i<g.length;i++,j+=4)g[i]=(d[j]*77+d[j+1]*150+d[j+2]*29)>>8;
+    var lq=liveQ();
+    detectAsync(g,w,h).then(function(found){cam.busy=false;if(cam.on&&lq&&cam.key===qkey())onFrame(found,w,h,lq)},function(){cam.busy=false});
+  }
+  requestAnimationFrame(loop)}
+function onFrame(all,w,h,lq){
+  var now=Date.now();if(cam.lastT)cam.fps=cam.fps*0.7+0.3*(1000/Math.max(1,now-cam.lastT));cam.lastT=now;
+  var found=all.filter(function(m){return m.id<NCARDS}),Q=lq.Q,ans=answersFor(lq.L,lq.i),map={},nNew=0;
+  found.forEach(function(m){var n=m.id+1,c=cam.cand[n];
+    if(c&&c.a===m.answer&&now-c.t<2500){c.c++;c.t=now}else c=cam.cand[n]={a:m.answer,c:1,t:now};
+    if(c.c>=2&&ans[n]!==m.answer){map[n]=m.answer;nNew++}});
+  if(nNew){saveAnswers(lq,map);try{if(navigator.vibrate)navigator.vibrate(25)}catch(e){}}
+  // calque : cadres sur les cartes vues
+  ov.width=w;ov.height=h;var o=ov.getContext('2d');o.clearRect(0,0,w,h);
+  var done=answersFor(liveQ()?liveQ().L:lq.L,lq.i);
+  found.forEach(function(m){var n=m.id+1,rec=done[n]===m.answer,good=LET.indexOf(m.answer)===Q.a;
+    var col=rec?(good?'#2E9E6B':'#D6455D'):'#FFCB2E';o.strokeStyle=col;o.lineWidth=Math.max(3,w/250);o.beginPath();
+    m.corners.forEach(function(p,i){i?o.lineTo(p[0],p[1]):o.moveTo(p[0],p[1])});o.closePath();o.stroke();
+    var fs=Math.max(18,w/40);o.font='800 '+fs+'px Nunito, sans-serif';var t=n+' '+m.answer,tw=o.measureText(t).width,x=m.center[0]-tw/2-6,y=m.center[1]-fs/2-4;
+    o.fillStyle=col;o.fillRect(x,y,tw+12,fs+8);o.fillStyle=rec?'#fff':'#3A2C00';o.fillText(t,x+6,y+fs)});
+  var roster=named(),got=Object.keys(done).length,miss=roster.filter(function(n){return !done[n]});
+  $('#s-tag').textContent=found.length+' carte'+(found.length>1?'s':'')+' en vue · '+got+(roster.length?' / '+roster.length:'')+' lues';
+  if(roster.length&&!miss.length){camStop();status('<b>Toute la classe est lue</b> ('+roster.length+' réponses). Tu peux révéler la réponse.');try{if(navigator.vibrate)navigator.vibrate([60,60,60])}catch(e){}return}
+  status(roster.length?(miss.length<=12?'Pas encore lues : '+miss.map(function(n){return esc(nameOf(n))}).join(', ')+'.':miss.length+' élèves pas encore lus.'):got+' carte'+(got>1?'s':'')+' lue'+(got>1?'s':'')+'.');
+}
+
+/* ---------- QUESTIONS ---------- */
+var editing=null,draft=null,confirmDel=null;
+function renderSets(){
+  var list=setsSorted();
+  $('#q-list').innerHTML=list.map(function(x){return '<div class="setItem"><span class="t">'+esc(x.s.title)+'</span><span class="muted">'+(x.s.questions||[]).length+' question'+((x.s.questions||[]).length>1?'s':'')+'</span><button class="mini" data-e="'+esc(x.id)+'">Modifier</button><button class="mini" data-d="'+esc(x.id)+'">Dupliquer</button>'+(confirmDel===x.id?'<button class="mini" data-x="'+esc(x.id)+'" style="color:var(--bad);border-color:var(--bad)">Confirmer la suppression</button>':'<button class="mini" data-r="'+esc(x.id)+'">Supprimer</button>')+'</div>'}).join('')||'<p class="muted">Aucune série pour l\'instant.</p>';
+  $$('#q-list [data-e]').forEach(function(b){b.onclick=function(){openEdit(b.getAttribute('data-e'))}});
+  $$('#q-list [data-d]').forEach(function(b){b.onclick=function(){var s=JSON.parse(JSON.stringify(S.sets[b.getAttribute('data-d')]));s.title+=' (copie)';s.order=Date.now();var id=uid('set-');S.sets[id]=s;writeDoc('sets/'+id,s,false);rerender()}});
+  $$('#q-list [data-r]').forEach(function(b){b.onclick=function(){confirmDel=b.getAttribute('data-r');renderSets()}});
+  $$('#q-list [data-x]').forEach(function(b){b.onclick=function(){var id=b.getAttribute('data-x');delete S.sets[id];confirmDel=null;delDoc('sets/'+id);if(editing===id)closeEdit();rerender();toast('Série supprimée')}});
+}
+function openEdit(id){editing=id;draft=JSON.parse(JSON.stringify(S.sets[id]||{title:'Nouvelle série',order:Date.now(),questions:[{q:'',c:['','','',''],a:0,e:''}]}));drawEdit()}
+function closeEdit(){editing=null;draft=null;var e=$('#q-edit');e.hidden=true;e.innerHTML=''}
+$('#q-new').onclick=function(){openEdit(uid('set-'))};
+function drawEdit(){
+  var e=$('#q-edit');e.hidden=false;
+  var h='<div class="row"><label for="qe-title">Titre</label><input id="qe-title" style="flex:1;min-width:200px" value="'+esc(draft.title)+'"></div>';
+  h+='<p class="note" style="margin:0">Écriture : <b>2^5</b> donne 2<sup>5</sup>, <b>10^{-3}</b> donne 10<sup>-3</sup>, <b>[3/4]</b> donne la fraction <span class="frac"><span>3</span><span>4</span></span>. Coche la bonne réponse.</p>';
+  draft.questions.forEach(function(Q,i){
+    h+='<div class="qcard"><div class="qhead"><span class="num">Question '+(i+1)+'</span><span class="sp"></span><button class="mini" data-up="'+i+'"'+(i?'':' disabled')+'>↑</button><button class="mini" data-dn="'+i+'"'+(i<draft.questions.length-1?'':' disabled')+'>↓</button><button class="mini" data-rm="'+i+'">Retirer</button></div>';
+    h+='<input id="qe-q'+i+'" data-f="q" data-i="'+i+'" placeholder="Énoncé, par ex. 2^5 = ?" value="'+esc(Q.q)+'"><div class="prev" id="qe-p'+i+'">'+fmt(Q.q)+'</div><div class="opts">';
+    for(var k=0;k<4;k++)h+='<div class="opt"><input type="radio" id="qe-a'+i+'-'+k+'" name="qa'+i+'" data-i="'+i+'" data-k="'+k+'"'+(Q.a===k?' checked':'')+' aria-label="Bonne réponse '+LET[k]+'"><b>'+LET[k]+'</b><input type="text" id="qe-c'+i+'-'+k+'" data-f="c" data-i="'+i+'" data-k="'+k+'" value="'+esc(Q.c[k])+'"></div>';
+    h+='</div><input id="qe-e'+i+'" data-f="e" data-i="'+i+'" placeholder="Explication affichée quand tu révèles (facultatif)" value="'+esc(Q.e||'')+'"></div>';
+  });
+  h+='<div class="row"><button class="btn" id="qe-add">Ajouter une question</button><span style="flex:1"></span><button class="btn ghost" id="qe-cancel">Annuler</button><button class="btn solid" id="qe-save">Enregistrer la série</button></div>';
+  e.innerHTML=h;
+  $('#qe-title').oninput=function(){draft.title=this.value};
+  $$('#q-edit input[data-f]').forEach(function(inp){inp.oninput=function(){var i=+inp.getAttribute('data-i'),f=inp.getAttribute('data-f');if(f==='c')draft.questions[i].c[+inp.getAttribute('data-k')]=inp.value;else draft.questions[i][f]=inp.value;if(f==='q')$('#qe-p'+i).innerHTML=fmt(inp.value)}});
+  $$('#q-edit input[type=radio]').forEach(function(r){r.onchange=function(){draft.questions[+r.getAttribute('data-i')].a=+r.getAttribute('data-k')}});
+  $$('#q-edit [data-up]').forEach(function(b){b.onclick=function(){var i=+b.getAttribute('data-up'),q=draft.questions;q.splice(i-1,0,q.splice(i,1)[0]);drawEdit()}});
+  $$('#q-edit [data-dn]').forEach(function(b){b.onclick=function(){var i=+b.getAttribute('data-dn'),q=draft.questions;q.splice(i+1,0,q.splice(i,1)[0]);drawEdit()}});
+  $$('#q-edit [data-rm]').forEach(function(b){b.onclick=function(){draft.questions.splice(+b.getAttribute('data-rm'),1);if(!draft.questions.length)draft.questions.push({q:'',c:['','','',''],a:0,e:''});drawEdit()}});
+  $('#qe-add').onclick=function(){draft.questions.push({q:'',c:['','','',''],a:0,e:''});drawEdit();var n=$('#qe-q'+(draft.questions.length-1));if(n)n.focus()};
+  $('#qe-cancel').onclick=closeEdit;
+  $('#qe-save').onclick=function(){var qs=draft.questions.filter(function(q){return q.q.trim()});if(!qs.length){toast('Écris au moins une question.');return}
+    var bad=qs.findIndex(function(q){return q.c.some(function(c){return !String(c).trim()})});if(bad>=0){toast('Question '+(bad+1)+' : remplis les 4 réponses.');return}
+    draft.questions=qs;draft.title=draft.title.trim()||'Série sans titre';S.sets[editing]=draft;writeDoc('sets/'+editing,draft,false);closeEdit();rerender();toast('Série enregistrée')};
+}
+
+/* ---------- CLASSE ---------- */
+var classDirty=false;
+function renderClass(){
+  if(classDirty)return;
+  $('#c-name').value=(S.classe&&S.classe.name)||'';var st=(S.classe&&S.classe.students)||{},h='';
+  for(var n=1;n<=NCARDS;n++)h+='<div class="rs"><span>'+n+'</span><input id="c-s'+n+'" data-n="'+n+'" placeholder="Prénom" value="'+esc(st[n]||'')+'" aria-label="Élève de la carte '+n+'"></div>';
+  $('#c-roster').innerHTML=h;
+  $$('#c-roster input').forEach(function(i){i.oninput=function(){classDirty=true}});
+}
+$('#c-name').oninput=function(){classDirty=true};
+$('#c-save').onclick=function(){var st={};$$('#c-roster input').forEach(function(i){var v=i.value.trim();if(v)st[i.getAttribute('data-n')]=v});
+  S.classe={name:$('#c-name').value.trim(),students:st};classDirty=false;writeDoc('config/classe',S.classe,false);rerender();toast('Classe enregistrée')};
+
+/* ---------- RÉSULTATS ---------- */
+var resConfirm=false;
+function sessSorted(){return Object.keys(S.sessions).map(function(k){return {id:k,s:S.sessions[k]}}).sort(function(a,b){return String(b.s.startedAt).localeCompare(String(a.s.startedAt))})}
+function dstr(iso){try{return new Date(iso).toLocaleDateString('fr-CH',{weekday:'short',day:'numeric',month:'short'})+' '+new Date(iso).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit'})}catch(e){return iso}}
+function grid(x){var qs=x.s.questions||[],ans=x.s.answers||{},nums=named().slice();
+  qs.forEach(function(_,i){Object.keys(ans['q'+i]||{}).forEach(function(n){n=+n;if(nums.indexOf(n)<0)nums.push(n)})});nums.sort(function(a,b){return a-b});
+  return {qs:qs,ans:ans,nums:nums}}
+function renderRes(){
+  $('#r-remote').hidden=mode!=='remote';
+  var sel=$('#r-sess'),cur=sel.value,list=sessSorted();
+  sel.innerHTML=list.map(function(x){return '<option value="'+esc(x.id)+'">'+esc(dstr(x.s.startedAt))+' · '+esc(x.s.title)+'</option>'}).join('')||'<option value="">Aucune séance</option>';
+  if(cur&&S.sessions[cur])sel.value=cur;
+  var x=list.find(function(y){return y.id===sel.value});$('#r-csv').disabled=$('#r-del').disabled=!x;
+  var cf=$('#r-confirm');cf.hidden=!resConfirm||!x;
+  if(!x){$('#r-tbl').innerHTML='';$('#r-sum').textContent='Lance une série pour voir les résultats ici.';}
+  else{
+    var G=grid(x),h='<thead><tr><th class="l">Carte</th><th class="l">Élève</th>'+G.qs.map(function(_,i){return '<th>Q'+(i+1)+'</th>'}).join('')+'<th>Score</th></tr></thead><tbody>',colOk=G.qs.map(function(){return 0}),colN=G.qs.map(function(){return 0});
+    G.nums.forEach(function(n){var ok=0;h+='<tr><td class="l">'+n+'</td><td class="l">'+esc(nameOf(n))+'</td>';
+      G.qs.forEach(function(Q,i){var a=(G.ans['q'+i]||{})[n];if(!a){h+='<td class="na">–</td>';return}colN[i]++;var g=LET.indexOf(a)===Q.a;if(g){ok++;colOk[i]++}h+='<td class="'+(g?'ok':'ko')+'">'+a+'</td>'});
+      h+='<td><b>'+ok+'</b> / '+G.qs.length+'</td></tr>'});
+    h+='</tbody><tfoot><tr><td class="l" colspan="2">Réussite</td>'+G.qs.map(function(_,i){return '<td>'+(colN[i]?Math.round(colOk[i]*100/colN[i])+' %':'–')+'</td>'}).join('')+'<td></td></tr></tfoot>';
+    $('#r-tbl').innerHTML=h;
+    $('#r-sum').innerHTML='Bonne réponse par question : '+G.qs.map(function(Q,i){return 'Q'+(i+1)+' '+LET[Q.a]}).join(' · ');
+    cf.innerHTML='Supprimer définitivement la séance du '+esc(dstr(x.s.startedAt))+' ? <button class="mini" id="r-yes" style="color:var(--bad);border-color:var(--bad)">Oui, supprimer</button> <button class="mini" id="r-no">Annuler</button>';
+    if(resConfirm){$('#r-yes').onclick=function(){delete S.sessions[x.id];if(S.live.sessionId===x.id)setLive({sessionId:null});delDoc('sessions/'+x.id);resConfirm=false;rerender();toast('Séance supprimée')};$('#r-no').onclick=function(){resConfirm=false;renderRes()}}
+  }
+  // bilan global
+  var tot={};list.forEach(function(y){var G=grid(y);G.nums.forEach(function(n){G.qs.forEach(function(Q,i){var a=(G.ans['q'+i]||{})[n];if(!a)return;var t=tot[n]=tot[n]||{ok:0,n:0,s:{}};t.n++;t.s[y.id]=1;if(LET.indexOf(a)===Q.a)t.ok++})})});
+  var ks=Object.keys(tot).map(Number).sort(function(a,b){return a-b});
+  $('#r-all').innerHTML=ks.length?'<thead><tr><th class="l">Carte</th><th class="l">Élève</th><th>Séances</th><th>Réponses</th><th>Justes</th><th>Réussite</th></tr></thead><tbody>'+ks.map(function(n){var t=tot[n];return '<tr><td class="l">'+n+'</td><td class="l">'+esc(nameOf(n))+'</td><td>'+Object.keys(t.s).length+'</td><td>'+t.n+'</td><td>'+t.ok+'</td><td><b>'+Math.round(t.ok*100/t.n)+' %</b></td></tr>'}).join('')+'</tbody>':'<tbody><tr><td class="muted">Pas encore de réponses.</td></tr></tbody>';
+}
+$('#r-sess').onchange=function(){resConfirm=false;renderRes()};
+$('#r-del').onclick=function(){resConfirm=true;renderRes()};
+$('#r-csv').onclick=function(){var x=sessSorted().find(function(y){return y.id===$('#r-sess').value});if(!x)return;var G=grid(x);
+  var L=[['Carte','Élève'].concat(G.qs.map(function(_,i){return 'Q'+(i+1)})).concat(['Score','Sur'])];
+  G.nums.forEach(function(n){var ok=0,r=[n,nameOf(n)];G.qs.forEach(function(Q,i){var a=(G.ans['q'+i]||{})[n]||'';if(a&&LET.indexOf(a)===Q.a)ok++;r.push(a)});r.push(ok,G.qs.length);L.push(r)});
+  var csv='﻿'+L.map(function(r){return r.map(function(c){c=String(c);return /[;"\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c}).join(';')}).join('\r\n');
+  var fn='Resultats '+(x.s.title||'').replace(/[^\wÀ-ÿ ·-]/g,'').slice(0,60)+' '+String(x.s.startedAt).slice(0,10)+'.csv';
+  saveFile(fn,new Blob([csv],{type:'text/csv;charset=utf-8'}))};
+function saveFile(name,blob){var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},1500)}
+$('#c-backup').onclick=function(){if(mode==='remote'){toast('Fais la sauvegarde sur l\'ordinateur.');return}
+  saveFile('Cartes-reponses sauvegarde '+new Date().toISOString().slice(0,10)+'.json',new Blob([JSON.stringify(S,null,1)],{type:'application/json'}))};
+$('#c-restore').onchange=function(){var f=this.files&&this.files[0];this.value='';if(!f)return;if(mode==='remote'){toast('Restaure la sauvegarde sur l\'ordinateur.');return}
+  var r=new FileReader();r.onload=function(){try{var v=JSON.parse(r.result);if(!v||typeof v!=='object'||!v.sets)throw 0;
+    S={classe:v.classe||{name:'',students:{}},sets:v.sets||{},sessions:v.sessions||{},live:{}};classDirty=false;lsPut();broadcast();rerender();toast('Sauvegarde restaurée')}catch(e){toast('Ce fichier n\'est pas une sauvegarde de Cartes-réponses.')}};r.readAsText(f)};
+
+var rc=lsGetK('cr-remote');
+if(rc){myCode=lsGetK('cr-code');startRemote(rc)}else{loadLocal();startHost()}
+render();
+})();
+</script>
+</body>
+</html>
