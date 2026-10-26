@@ -155,7 +155,7 @@ tfoot td{font-weight:800;background:var(--bg)}
 <body>
 <div class="wrap">
   <header>
-    <h1>Cartes-réponses</h1><span class="muted" style="font-size:12px">version 8</span>
+    <h1>Cartes-réponses</h1><span class="muted" style="font-size:12px">version 9</span>
     <span class="link" id="link"></span>
     <nav class="tabs" role="tablist">
       <button role="tab" data-v="proj" aria-selected="true">Projeter</button>
@@ -474,7 +474,12 @@ function delMark(kind,id){S.deleted=S.deleted||{};S.deleted[kind]=S.deleted[kind
 function applyWrite(path,data){var p=path.split('/');
   if(path==='config/classes'&&data){var old=(S.classes&&S.classes.list)||{};for(var k in old)if(!data.list||!data.list[k])delMark('classes',k);S.classes=data}else if(p[0]==='config'&&data)S.classe=data;else if(p[0]==='live')S.live=data||{};
   else if((p[0]==='sets'||p[0]==='sessions')&&p[1]){if(data==null){delete S[p[0]][p[1]];delMark(p[0],p[1])}else S[p[0]][p[1]]=data}}
-function writeDoc(path,data){data=clone(data);applyWrite(path,data);if(mode==='remote'){rsend({t:'w',path:path,data:data});lsPut()}else{lsPut();broadcast(path.indexOf('sets/')===0)}rerender();return Promise.resolve()}
+function noTs(o){var c=clone(o)||{};delete c.ts;return JSON.stringify(c)}
+function stampTs(path,data){if(!data)return;var p=path.split('/');
+  if(p[0]==='sets'&&p[1])data.ts=Date.now();
+  else if(path==='config/classes'&&data.list){var old=(S.classes&&S.classes.list)||{};for(var k in data.list){var n=data.list[k],o=old[k];if(!n)continue;if(o&&noTs(o)===noTs(n)){if(o.ts)n.ts=o.ts}else n.ts=Date.now()}}}
+function newer(a,b,tieIn){if(!b)return true;var x=(a&&a.ts)||0,y=b.ts||0;return x>y||(tieIn&&x===y)}
+function writeDoc(path,data){data=clone(data);stampTs(path,data);applyWrite(path,data);if(mode==='remote'){rsend({t:'w',path:path,data:data});lsPut()}else{lsPut();broadcast(path.indexOf('sets/')===0)}rerender();return Promise.resolve()}
 function delDoc(path){return writeDoc(path,null)}
 function mergeAns(id,key,map){var s=S.sessions[id];if(!s)return;s.answers=s.answers||{};var cur=s.answers[key]=s.answers[key]||{};for(var n in map){if(map[n]==null)delete cur[n];else cur[n]=map[n]}}
 function deepMerge(a,b){for(var k in b){if(b[k]&&typeof b[k]==='object'&&!Array.isArray(b[k])){a[k]=deepMerge(a[k]&&typeof a[k]==='object'?a[k]:{},b[k])}else a[k]=b[k]}return a}
@@ -542,8 +547,8 @@ function startRemote(code){
     linkMsg='Étape 2/3 : connexion au service de liaison…';rerender();
     peer=new Peer({debug:0});
     relayHook(function(src,m){if(src!==PREFIX+remoteCode||!m)return;
-      if(m.t==='syncAll'&&m.data){mergeData(m.data);phonePut();synced=true;rerender();return}
-      if(m.t==='state'&&m.S){S.classe=m.S.classe||{name:'',students:{}};mergeDeleted(m.S.deleted);mergeData({classes:m.S.classes,sets:m.S.sets||{},sessions:{}});S.live=m.S.live||{};for(var k in m.S.sessions)S.sessions[k]=m.S.sessions[k];purgeDeleted();phonePut();
+      if(m.t==='syncAll'&&m.data){mergeData(m.data,true);phonePut();synced=true;rerender();return}
+      if(m.t==='state'&&m.S){S.classe=m.S.classe||{name:'',students:{}};mergeDeleted(m.S.deleted);mergeData({classes:m.S.classes,sets:m.S.sets||{},sessions:{}},true);S.live=m.S.live||{};for(var k in m.S.sessions)S.sessions[k]=m.S.sessions[k];purgeDeleted();phonePut();
         lastState=Date.now();if(!remoteOk){remoteOk=true;linkMsg='';var o=outbox;outbox=[];o.forEach(function(x){relaySend(PREFIX+remoteCode,x)})}
         if(m.S.boot&&m.S.boot!==lastBoot){lastBoot=m.S.boot;relaySend(PREFIX+remoteCode,{t:'sync',data:dataForFile()})}rerender()}});
     peer.on('open',function(){peerReady=true;hello(true)});
@@ -766,7 +771,7 @@ function closeEdit(){editing=null;draft=null;var e=$('#q-edit');e.hidden=true;e.
 $('#q-new').onclick=function(){openEdit(uid('set-'))};
 $('#q-import').onchange=function(){var f=this.files&&this.files[0];this.value='';if(!f)return;if(mode==='remote'){toast('Importe les séries depuis l\'ordinateur.');return}
   var r=new FileReader();r.onload=function(){try{var v=JSON.parse(r.result);if(!v||typeof v!=='object'||!v.sets)throw 0;var n=0;
-    for(var k in v.sets){var st=v.sets[k];if(!st||!Array.isArray(st.questions))continue;S.sets[k]=st;writeDoc('sets/'+k,st,false);n++}
+    for(var k in v.sets){var st=v.sets[k];if(!st||!Array.isArray(st.questions))continue;writeDoc('sets/'+k,st,false);n++}
     if(!n)throw 0;lsPut();broadcast(true);rerender();toast(n+' série'+(n>1?'s importées':' importée'))}catch(e){toast('Ce fichier ne contient pas de séries de questions.')}};r.readAsText(f)};
 function drawEdit(){
   var e=$('#q-edit');e.hidden=false;
@@ -888,10 +893,10 @@ function sessAnsCount(x){var n=0,a=(x&&x.answers)||{};for(var k in a)n+=Object.k
 function purgeDeleted(){var D=S.deleted||{},k;for(k in (D.sessions||{}))delete S.sessions[k];for(k in (D.sets||{}))delete S.sets[k];
   if(S.classes&&S.classes.list){for(k in (D.classes||{}))delete S.classes.list[k];if(S.classes.cur&&!S.classes.list[S.classes.cur])S.classes.cur=null}}
 function mergeDeleted(d){if(!d)return;['sessions','sets','classes'].forEach(function(t){for(var k in (d[t]||{}))delMark(t,k)})}
-function mergeData(v){if(!v||typeof v!=='object')return;mergeDeleted(v.deleted);
+function mergeData(v,hostWins){if(!v||typeof v!=='object')return;mergeDeleted(v.deleted);
   var c=v.classes&&v.classes.list?v.classes:{list:{},cur:null};S.classes=S.classes&&S.classes.list?S.classes:{list:{},cur:null};
-  for(var k in c.list)S.classes.list[k]=c.list[k];if(c.cur&&S.classes.list[c.cur])S.classes.cur=c.cur;
-  for(k in (v.sets||{}))S.sets[k]=v.sets[k];
+  for(var k in c.list)if(newer(c.list[k],S.classes.list[k],hostWins))S.classes.list[k]=c.list[k];if(c.cur&&S.classes.list[c.cur])S.classes.cur=c.cur;
+  for(k in (v.sets||{}))if(newer(v.sets[k],S.sets[k],hostWins))S.sets[k]=v.sets[k];
   for(k in (v.sessions||{})){var a=v.sessions[k],b=S.sessions[k];if(!b||sessAnsCount(a)>=sessAnsCount(b))S.sessions[k]=a}
   purgeDeleted()}
 function useHandle(h,read){
