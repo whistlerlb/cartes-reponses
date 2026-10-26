@@ -113,6 +113,9 @@ sup{font-size:.62em;line-height:0;vertical-align:.75em}
 .link.ok{background:var(--goodS);color:var(--good)}
 .conn{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .conn input{width:120px;font:700 22px var(--fd);letter-spacing:4px;text-align:center}
+.fileBar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;border:2px solid var(--warn);background:var(--surf)}
+.fileBar b{color:var(--warn)}
+.fileOk{color:var(--good);font-weight:800;font-size:14px}
 /* ---- Questions ---- */
 .qcard{border:1.5px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;background:var(--bg)}
 .qhead{display:flex;align-items:center;gap:8px}
@@ -152,7 +155,7 @@ tfoot td{font-weight:800;background:var(--bg)}
 <body>
 <div class="wrap">
   <header>
-    <h1>Cartes-réponses</h1><span class="muted" style="font-size:12px">version 6</span>
+    <h1>Cartes-réponses</h1><span class="muted" style="font-size:12px">version 7</span>
     <span class="link" id="link"></span>
     <nav class="tabs" role="tablist">
       <button role="tab" data-v="proj" aria-selected="true">Projeter</button>
@@ -162,7 +165,7 @@ tfoot td{font-weight:800;background:var(--bg)}
       <button role="tab" data-v="res">Résultats</button>
     </nav>
   </header>
-  <div id="storeNote" class="note" hidden></div>
+  <div id="fileBar" class="note fileBar" hidden></div>
 
   <!-- PROJETER -->
   <section class="panel" id="v-proj">
@@ -207,9 +210,11 @@ tfoot td{font-weight:800;background:var(--bg)}
     <div class="row"><h2 style="flex:1">Mes classes</h2><button class="btn" id="c-add">Ajouter une classe</button></div>
     <p class="note" style="margin:0">Seuls le nom de la classe et le nombre d'élèves sont enregistrés, aucun prénom. Distribue les cartes 1, 2, 3… et garde de ton côté la liste « numéro de carte → élève » : chaque élève reprend toujours la même carte.</p>
     <div class="setList" id="c-list"></div>
-    <h3>Sauvegarde</h3>
-    <p class="note" style="margin:0">Tout (classe, séries, résultats) est enregistré dans le navigateur de cet ordinateur. Fais une sauvegarde de temps en temps ; elle sert aussi à tout transférer sur un autre ordinateur.</p>
-    <div class="row"><button class="btn" id="c-backup">Télécharger une sauvegarde</button><label class="btn ghost" for="c-restore" style="display:inline-flex;align-items:center;position:relative">Restaurer une sauvegarde<input type="file" id="c-restore" accept=".json,application/json" style="position:absolute;inset:0;opacity:0;width:100%"></label></div>
+    <h3>Fichier de données</h3>
+    <p class="note" style="margin:0">Tes classes, séries et résultats sont enregistrés dans un fichier à toi (dans ton OneDrive ou sur une clé USB, par exemple), automatiquement à chaque changement. Au cours suivant, même sur un autre ordinateur, tu rouvres ce fichier et tout est là.</p>
+    <div id="fileBox" class="row"></div>
+    <details><summary class="muted" style="cursor:pointer;font-weight:800;font-size:14px">Autres options</summary>
+    <div class="row" style="margin-top:10px"><button class="btn ghost" id="c-backup">Télécharger une copie</button><label class="btn ghost" for="c-restore" style="display:inline-flex;align-items:center;position:relative">Importer une copie<input type="file" id="c-restore" accept=".json,application/json" style="position:absolute;inset:0;opacity:0;width:100%"></label></div></details>
   </section>
 
   <!-- RÉSULTATS -->
@@ -460,10 +465,10 @@ var S={classe:{name:'',students:{}},sets:{},sessions:{},live:{}};
 function clone(o){return o==null?o:JSON.parse(JSON.stringify(o))}
 function lsGet(){try{var v=localStorage.getItem('cr-data');return v?JSON.parse(v):null}catch(e){return null}}
 var lsWarned=false;
-function lsPut(){if(mode==='remote')return;try{localStorage.setItem('cr-data',JSON.stringify(S))}catch(e){if(!lsWarned){lsWarned=true;toast('Mémoire du navigateur pleine : télécharge une sauvegarde.')}}}
+function lsPut(){if(mode==='remote')return;scheduleFileSave();try{localStorage.setItem('cr-data',JSON.stringify(S))}catch(e){if(!lsWarned){lsWarned=true;toast('Mémoire du navigateur pleine : télécharge une sauvegarde.')}}}
 function lsGetK(k){try{return localStorage.getItem(k)}catch(e){return null}}
 function lsSetK(k,v){try{if(v==null)localStorage.removeItem(k);else localStorage.setItem(k,v)}catch(e){}}
-function render(){renderProj();renderScan();renderSets();renderClass();renderRes();renderLink()}
+function render(){renderProj();renderScan();renderSets();renderClass();renderRes();renderLink();try{renderFile()}catch(e){}}
 var rq=0;function rerender(){if(rq)return;rq=requestAnimationFrame(function(){rq=0;render()})}
 function applyWrite(path,data){var p=path.split('/');
   if(path==='config/classes'&&data)S.classes=data;else if(p[0]==='config'&&data)S.classe=data;else if(p[0]==='live')S.live=data||{};
@@ -853,10 +858,50 @@ $('#r-csvall').onclick=function(){var list=sessSorted().slice().reverse();if(!li
   saveFile(cname.replace(/[\\/:*?"<>|]/g,'')+' - tous les resultats '+new Date().toISOString().slice(0,10)+'.csv',new Blob([toCsv(L)],{type:'text/csv;charset=utf-8'}))};
 function saveFile(name,blob){var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},1500)}
 $('#c-backup').onclick=function(){if(mode==='remote'){toast('Fais la sauvegarde sur l\'ordinateur.');return}
-  saveFile('Cartes-reponses sauvegarde '+new Date().toISOString().slice(0,10)+'.json',new Blob([JSON.stringify(S,null,1)],{type:'application/json'}))};
+  saveFile('Cartes-reponses copie '+new Date().toISOString().slice(0,10)+'.json',new Blob([JSON.stringify(dataForFile(),null,1)],{type:'application/json'}))};
 $('#c-restore').onchange=function(){var f=this.files&&this.files[0];this.value='';if(!f)return;if(mode==='remote'){toast('Restaure la sauvegarde sur l\'ordinateur.');return}
   var r=new FileReader();r.onload=function(){try{var v=JSON.parse(r.result);if(!v||typeof v!=='object'||!v.sets)throw 0;
-    S={classe:v.classe||{name:'',students:{}},classes:v.classes||{list:{},cur:null},sets:v.sets||{},sessions:v.sessions||{},live:{}};migrateClasses();classDirty=false;lsPut();broadcast(true);rerender();toast('Sauvegarde restaurée')}catch(e){toast('Ce fichier n\'est pas une sauvegarde de Cartes-réponses.')}};r.readAsText(f)};
+    mergeData(v);migrateClasses();classDirty=false;lsPut();broadcast(true);rerender();toast('Copie importée')}catch(e){toast('Ce fichier n\'est pas une sauvegarde de Cartes-réponses.')}};r.readAsText(f)};
+
+/* ---------- fichier de données (enregistrement automatique) ---------- */
+var FSA=!!(window.showOpenFilePicker&&window.showSaveFilePicker),fileH=null,fileSaved=0,fileTimer=null,fileErr='',storedH=null;
+function idb(){return new Promise(function(res,rej){try{var r=indexedDB.open('cartes-reponses',1);r.onupgradeneeded=function(){r.result.createObjectStore('kv')};r.onsuccess=function(){res(r.result)};r.onerror=function(){rej(r.error)}}catch(e){rej(e)}})}
+function idbGet(k){return idb().then(function(d){return new Promise(function(res){var t=d.transaction('kv').objectStore('kv').get(k);t.onsuccess=function(){res(t.result)};t.onerror=function(){res(null)}})}).catch(function(){return null})}
+function idbSet(k,v){return idb().then(function(d){return new Promise(function(res){var t=d.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=res;t.onerror=res})}).catch(function(){})}
+function dataForFile(){return {app:'cartes-reponses',version:1,savedAt:new Date().toISOString(),classes:S.classes,sets:S.sets,sessions:S.sessions}}
+function scheduleFileSave(){if(!fileH)return;clearTimeout(fileTimer);fileTimer=setTimeout(writeFile,1000)}
+function writeFile(){if(!fileH)return Promise.resolve();var h=fileH;
+  return h.createWritable().then(function(w){return w.write(JSON.stringify(dataForFile(),null,1)).then(function(){return w.close()})})
+    .then(function(){fileSaved=Date.now();fileErr='';renderFile()})
+    .catch(function(e){fileErr='Enregistrement impossible ('+(e&&e.name||e)+'). Rouvre le fichier.';if(e&&e.name==='NotAllowedError')fileH=null;renderFile()})}
+function sessAnsCount(x){var n=0,a=(x&&x.answers)||{};for(var k in a)n+=Object.keys(a[k]||{}).length;return n}
+function mergeData(v){if(!v||typeof v!=='object')return;
+  var c=v.classes&&v.classes.list?v.classes:{list:{},cur:null};S.classes=S.classes&&S.classes.list?S.classes:{list:{},cur:null};
+  for(var k in c.list)S.classes.list[k]=c.list[k];if(c.cur&&S.classes.list[c.cur])S.classes.cur=c.cur;
+  for(k in (v.sets||{}))S.sets[k]=v.sets[k];
+  for(k in (v.sessions||{})){var a=v.sessions[k],b=S.sessions[k];if(!b||sessAnsCount(a)>=sessAnsCount(b))S.sessions[k]=a}}
+function useHandle(h,read){
+  return h.queryPermission({mode:'readwrite'}).then(function(p){return p==='granted'?p:h.requestPermission({mode:'readwrite'})}).then(function(p){
+    if(p!=='granted'){toast('Accès au fichier refusé.');return}
+    return (read?h.getFile().then(function(f){return f.text()}).then(function(t){if(t.trim()){var v=JSON.parse(t);if(v.app!=='cartes-reponses'&&!v.sets)throw new Error('format');mergeData(v)}}):Promise.resolve())
+      .then(function(){fileH=h;storedH=h;idbSet('file',h);lsPut();return writeFile()}).then(function(){broadcast(true);rerender();toast('Fichier « '+h.name+' » ouvert : enregistrement automatique activé')})
+  }).catch(function(e){if(e&&e.name==='AbortError')return;toast(e&&e.message==='format'?'Ce fichier n\'est pas un fichier Cartes-réponses.':'Impossible d\'ouvrir ce fichier.')})}
+var FT={types:[{description:'Données Cartes-réponses',accept:{'application/json':['.json']}}],excludeAcceptAllOption:false};
+function fileOpen(){window.showOpenFilePicker(FT).then(function(hs){return useHandle(hs[0],true)}).catch(function(){})}
+function fileCreate(){window.showSaveFilePicker(Object.assign({suggestedName:'Cartes-reponses donnees.json'},FT)).then(function(h){return useHandle(h,false)}).catch(function(){})}
+function fileResume(){if(storedH)useHandle(storedH,true)}
+function fileButtons(){if(!FSA)return '<span class="muted" style="font-size:14px">Ce navigateur ne sait pas enregistrer dans un fichier : utilise Edge ou Chrome sur l\'ordinateur, ou « Télécharger une copie » à la fin du cours.</span>';
+  return (storedH?'<button class="btn solid" data-file="resume">Reprendre « '+esc(storedH.name)+' »</button>':'')+'<button class="btn'+(storedH?' ghost':' solid')+'" data-file="open">Ouvrir mon fichier</button><button class="btn ghost" data-file="create">Créer un nouveau fichier</button>'}
+function wireFile(root){[].forEach.call(root.querySelectorAll('[data-file]'),function(b){b.onclick=function(){var a=b.getAttribute('data-file');if(a==='open')fileOpen();else if(a==='create')fileCreate();else fileResume()}})}
+function renderFile(){
+  var box=$('#fileBox'),bar=$('#fileBar');
+  if(mode==='remote'){box.innerHTML='<span class="muted">Le fichier de données se gère sur l\'ordinateur du projecteur.</span>';bar.hidden=true;return}
+  if(fileH){box.innerHTML='<span class="fileOk">Fichier « '+esc(fileH.name)+' » : enregistré'+(fileSaved?' à '+new Date(fileSaved).toLocaleTimeString('fr-CH',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'')+'</span>'+(fileErr?'<span style="color:var(--bad);font-weight:800">'+esc(fileErr)+'</span>':'')+'<button class="mini" data-file="open">Ouvrir un autre fichier</button>';
+    bar.hidden=!fileErr;if(fileErr){bar.innerHTML='<b>'+esc(fileErr)+'</b>'+fileButtons();wireFile(bar)}}
+  else{box.innerHTML=fileButtons();bar.hidden=false;
+    bar.innerHTML='<b>'+(storedH?'Reprends ton fichier de données pour retrouver tes classes et résultats.':'Tes données ne sont pas encore enregistrées dans un fichier.')+'</b>'+fileButtons();wireFile(bar)}
+  wireFile(box)}
+idbGet('file').then(function(h){storedH=h||null;renderFile()});
 
 var rc=lsGetK('cr-remote');
 if(rc){myCode=lsGetK('cr-code');startRemote(rc)}else{loadLocal();startHost()}
