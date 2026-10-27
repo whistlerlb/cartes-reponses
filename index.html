@@ -155,7 +155,7 @@ tfoot td{font-weight:800;background:var(--bg)}
 <body>
 <div class="wrap">
   <header>
-    <h1>Cartes-réponses</h1><span class="muted" style="font-size:12px">version 9</span>
+    <h1>Cartes-réponses</h1><span class="muted" style="font-size:12px">version 10</span>
     <span class="link" id="link"></span>
     <nav class="tabs" role="tablist">
       <button role="tab" data-v="proj" aria-selected="true">Projeter</button>
@@ -479,7 +479,7 @@ function stampTs(path,data){if(!data)return;var p=path.split('/');
   if(p[0]==='sets'&&p[1])data.ts=Date.now();
   else if(path==='config/classes'&&data.list){var old=(S.classes&&S.classes.list)||{};for(var k in data.list){var n=data.list[k],o=old[k];if(!n)continue;if(o&&noTs(o)===noTs(n)){if(o.ts)n.ts=o.ts}else n.ts=Date.now()}}}
 function newer(a,b,tieIn){if(!b)return true;var x=(a&&a.ts)||0,y=b.ts||0;return x>y||(tieIn&&x===y)}
-function writeDoc(path,data){data=clone(data);stampTs(path,data);applyWrite(path,data);if(mode==='remote'){rsend({t:'w',path:path,data:data});lsPut()}else{lsPut();broadcast(path.indexOf('sets/')===0)}rerender();return Promise.resolve()}
+function writeDoc(path,data){data=clone(data);stampTs(path,data);applyWrite(path,data);if(mode==='remote'){rsend({t:'w',path:path,data:data});lsPut()}else{lsPut();broadcast();var pp=path.split('/');if(pp[0]==='sets'&&pp[1]&&data)for(var cid in clients)relaySend(cid,{t:'item',kind:'sets',id:pp[1],data:data})}rerender();return Promise.resolve()}
 function delDoc(path){return writeDoc(path,null)}
 function mergeAns(id,key,map){var s=S.sessions[id];if(!s)return;s.answers=s.answers||{};var cur=s.answers[key]=s.answers[key]||{};for(var n in map){if(map[n]==null)delete cur[n];else cur[n]=map[n]}}
 function deepMerge(a,b){for(var k in b){if(b[k]&&typeof b[k]==='object'&&!Array.isArray(b[k])){a[k]=deepMerge(a[k]&&typeof a[k]==='object'?a[k]:{},b[k])}else a[k]=b[k]}return a}
@@ -490,14 +490,16 @@ function deepMerge(a,b){for(var k in b){if(b[k]&&typeof b[k]==='object'&&!Array.
 var PREFIX='cartes-rep-wlb-',mode='host',peer=null,linkMsg='',myCode=null,remoteCode=null,peerReady=false;
 var BOOT=Math.random().toString(36).slice(2),lastBoot=null,synced=false,clients={},remoteOk=false,lastState=0,helloT=null,outbox=[];
 function code4(){return String(Math.floor(1000+Math.random()*9000))}
-function snapshotFor(full){var L=S.live&&S.live.sessionId,ss={};if(L&&S.sessions[L])ss[L]=S.sessions[L];var o={classe:S.classe,classes:S.classes,live:S.live,sessions:ss,deleted:S.deleted||{},boot:BOOT};if(full)o.sets=S.sets;return o}
+function snapshotFor(full){var L=S.live&&S.live.sessionId,ss={};if(L&&S.sessions[L])ss[L]=S.sessions[L];var o={classe:S.classe,classes:S.classes,live:S.live,sessions:ss,deleted:S.deleted||{},boot:BOOT};return o}
 var CH=2800,rx={};
 function relaySend(dst,msg){if(!peer||!peer.socket||peer.destroyed||!peerReady)return false;
   var j=JSON.stringify(msg),id=Math.random().toString(36).slice(2,8),n=Math.ceil(j.length/CH)||1;
   var pk=function(part){try{peer.socket.send({type:'CANDIDATE',dst:dst,payload:{candidate:{candidate:'',sdpMid:'0',sdpMLineIndex:0},type:'data',connectionId:'dc_crrelay',cr:part}});return true}catch(e){return false}};
   if(n===1)return pk({j:j});
-  for(var i=0;i<n;i++)(function(i){var part={c:id,i:i,n:n,p:j.slice(i*CH,(i+1)*CH)};if(n<=6)pk(part);else setTimeout(function(){pk(part)},i*25)})(i);
-  return true}
+  for(var i=0;i<n;i++)sendQ.push({pk:pk,part:{c:id,i:i,n:n,p:j.slice(i*CH,(i+1)*CH)}});
+  drainQ();return true}
+var sendQ=[],qT=null;
+function drainQ(){if(qT)return;(function tick(){var x=sendQ.shift();if(!x){qT=null;return}x.pk(x.part);qT=setTimeout(tick,60)})()}
 function relayHook(onMsg){peer.socket.on('message',function(m){
   if(!m||!m.payload||!m.payload.cr||!m.src)return;
   try{if(peer._lostMessages&&peer._lostMessages.clear)peer._lostMessages.clear()}catch(e){}
@@ -508,7 +510,7 @@ function relayHook(onMsg){peer.socket.on('message',function(m){
     for(var q in rx)if(Date.now()-rx[q].t>20000)delete rx[q]}
   if(txt!=null){var d;try{d=JSON.parse(txt)}catch(e){return}onMsg(m.src,d)}})}
 function broadcast(full){if(mode!=='host')return;var m={t:'state',S:snapshotFor(full)},now=Date.now();
-  for(var id in clients){if(now-clients[id]>45000){delete clients[id];continue}relaySend(id,m)}}
+  for(var id in clients){if(now-clients[id]>45000){delete clients[id];continue}relaySend(id,m);if(full)relaySend(id,{t:'resync'})}}
 function clientCount(){var n=0,now=Date.now();for(var id in clients)if(now-clients[id]<45000)n++;return n}
 function rsend(m){if(remoteOk&&relaySend(PREFIX+remoteCode,m))return;outbox.push(m)}
 function whenPeer(fn){if(window.Peer){fn();return}var n=0,t=setInterval(function(){if(window.Peer){clearInterval(t);fn()}else if(++n>40){clearInterval(t);linkMsg='Liaison indisponible : le réseau bloque peut-être le service (unpkg/jsdelivr).';rerender()}},250)}
@@ -528,11 +530,31 @@ function startHost(){
   });
   setInterval(rerenderLinkOnly,5000);
 }
+/* synchronisation : on échange d'abord un sommaire, puis seulement les séries et séances manquantes, une par une */
+function fp(o){var t=noTs(o),h=5381;for(var i=0;i<t.length;i++)h=((h<<5)+h+t.charCodeAt(i))|0;return (h>>>0).toString(36)}
+function manifest(){var m={sets:{},sessions:{},classes:S.classes,deleted:S.deleted||{}},k;
+  for(k in S.sets)m.sets[k]={f:fp(S.sets[k]),ts:S.sets[k].ts||0};
+  for(k in S.sessions)m.sessions[k]={n:sessAnsCount(S.sessions[k])};return m}
+function takeItem(kind,id,data,hostWins){if(!data)return false;if((S.deleted&&S.deleted[kind]&&S.deleted[kind][id]))return false;
+  var o={};o[kind]={};o[kind][id]=data;var before=JSON.stringify(S[kind][id]||null);mergeData(o,hostWins);return JSON.stringify(S[kind][id]||null)!==before}
+function sendItems(dst,kind,ids){ids.forEach(function(id){if(S[kind][id])relaySend(dst,{t:'item',kind:kind,id:id,data:S[kind][id]})})}
+var gotN={sets:0,sessions:0},gotT=null;
+function noteGot(kind){gotN[kind]++;clearTimeout(gotT);gotT=setTimeout(function(){var a=[];
+  if(gotN.sets)a.push(gotN.sets+' série'+(gotN.sets>1?'s':''));if(gotN.sessions)a.push(gotN.sessions+' séance'+(gotN.sessions>1?'s':''));
+  if(a.length)toast(a.join(' et ')+' récupérée'+((gotN.sets+gotN.sessions)>1?'s':'')+' depuis le téléphone');gotN={sets:0,sessions:0}},1500)}
 function onHostData(src,m){if(!m||typeof m!=='object')return;
   var isNew=!clients[src];clients[src]=Date.now();
-  if(m.t==='w'&&typeof m.path==='string'){applyWrite(m.path,m.data);lsPut();broadcast(m.path.indexOf('sets/')===0);rerender()}
+  if(m.t==='w'&&typeof m.path==='string'){applyWrite(m.path,m.data);lsPut();broadcast();rerender()}
   else if(m.t==='ans'&&m.id&&m.key&&m.map){mergeAns(m.id,m.key,m.map);lsPut();broadcast();rerender()}
   else if(m.t==='hello'){relaySend(src,{t:'state',S:snapshotFor(isNew||m.full)});if(isNew)rerender()}
+  else if(m.t==='man'&&m.man){var M=m.man,need={sets:[],sessions:[]},give={sets:[],sessions:[]},k;
+    mergeData({classes:M.classes,deleted:M.deleted});migrateClasses();
+    for(k in (M.sets||{})){var hs=S.sets[k];if(!hs||(M.sets[k].ts||0)>(hs.ts||0))need.sets.push(k)}
+    for(k in S.sets){var ps=(M.sets||{})[k];if(!ps||((S.sets[k].ts||0)>(ps.ts||0))||((S.sets[k].ts||0)===(ps.ts||0)&&ps.f!==fp(S.sets[k])))give.sets.push(k)}
+    for(k in (M.sessions||{})){var hz=S.sessions[k];if(!hz||M.sessions[k].n>sessAnsCount(hz))need.sessions.push(k)}
+    for(k in S.sessions){var pz=(M.sessions||{})[k];if(!pz||sessAnsCount(S.sessions[k])>pz.n)give.sessions.push(k)}
+    lsPut();relaySend(src,{t:'need',need:need,give:give});sendItems(src,'sets',give.sets);sendItems(src,'sessions',give.sessions);broadcast();rerender()}
+  else if(m.t==='item'&&m.id&&(m.kind==='sets'||m.kind==='sessions')){if(takeItem(m.kind,m.id,m.data,false)){noteGot(m.kind);lsPut();rerender()}}
   else if(m.t==='sync'&&m.data){var before=Object.keys(S.sessions).length;mergeData(m.data);migrateClasses();lsPut();relaySend(src,{t:'syncAll',data:dataForFile()});broadcast(true);rerender();
     var got=Object.keys(S.sessions).length-before;toast(got>0?got+' séance'+(got>1?'s':'')+' récupérée'+(got>1?'s':'')+' depuis le téléphone':'Téléphone synchronisé')}}
 function startRemote(code){
@@ -548,19 +570,24 @@ function startRemote(code){
     peer=new Peer({debug:0});
     relayHook(function(src,m){if(src!==PREFIX+remoteCode||!m)return;
       if(m.t==='syncAll'&&m.data){mergeData(m.data,true);phonePut();synced=true;rerender();return}
+      if(m.t==='resync'){synced=false;relaySend(PREFIX+remoteCode,{t:'man',man:manifest()});return}
+      if(m.t==='item'&&m.id&&(m.kind==='sets'||m.kind==='sessions')){if(takeItem(m.kind,m.id,m.data,true)){phonePut();rerender()}return}
+      if(m.t==='need'&&m.need){sendItems(PREFIX+remoteCode,'sets',m.need.sets||[]);sendItems(PREFIX+remoteCode,'sessions',m.need.sessions||[]);
+        var nn=(m.need.sets||[]).length+(m.need.sessions||[]).length+((m.give&&m.give.sets)||[]).length+((m.give&&m.give.sessions)||[]).length;
+        if(!nn)synced=true;rerender();return}
       if(m.t==='state'&&m.S){S.classe=m.S.classe||{name:'',students:{}};mergeDeleted(m.S.deleted);mergeData({classes:m.S.classes,sets:m.S.sets||{},sessions:{}},true);S.live=m.S.live||{};for(var k in m.S.sessions)S.sessions[k]=m.S.sessions[k];purgeDeleted();phonePut();
         lastState=Date.now();if(!remoteOk){remoteOk=true;linkMsg='';var o=outbox;outbox=[];o.forEach(function(x){relaySend(PREFIX+remoteCode,x)})}
-        if(m.S.boot&&m.S.boot!==lastBoot){lastBoot=m.S.boot;relaySend(PREFIX+remoteCode,{t:'sync',data:dataForFile()})}rerender()}});
+        if(m.S.boot&&m.S.boot!==lastBoot){lastBoot=m.S.boot;synced=false;relaySend(PREFIX+remoteCode,{t:'man',man:manifest()})}rerender()}});
     peer.on('open',function(){peerReady=true;hello(true)});
     peer.on('error',function(e){if(mode!=='remote')return;linkMsg='Liaison interrompue, reconnexion…';remoteOk=false;rerender()});
     peer.on('disconnected',function(){peerReady=false;remoteOk=false;rerender();setTimeout(function(){try{if(!peer.destroyed)peer.reconnect()}catch(x){}},2000)});
   });
   var tries=0;
   function hello(full){if(mode!=='remote')return;clearTimeout(helloT);
-    if(peerReady){relaySend(PREFIX+remoteCode,{t:'hello',full:!!full||!remoteOk});tries++}
+    if(peerReady){relaySend(PREFIX+remoteCode,{t:'hello',full:!!full||!remoteOk});tries++;if(remoteOk&&!synced)relaySend(PREFIX+remoteCode,{t:'man',man:manifest()})}
     if(remoteOk&&Date.now()-lastState>25000){remoteOk=false;linkMsg='Liaison perdue, reconnexion…';rerender()}
     if(!remoteOk&&peerReady){linkMsg='Étape 3/3 : recherche de l\'ordinateur '+remoteCode+(tries>2?' (toujours rien : la page est-elle ouverte sur l\'ordinateur avec ce code ?)':'')+'…';rerender()}
-    helloT=setTimeout(function(){hello(false)},remoteOk?10000:3000)}
+    helloT=setTimeout(function(){hello(false)},remoteOk?(synced?10000:4000):3000)}
 }
 function rerenderLinkOnly(){try{renderLink()}catch(e){}}
 function stopRemote(){mode='host';remoteCode=null;remoteOk=false;clearTimeout(helloT);lsSetK('cr-remote',null);if(peer)try{peer.destroy()}catch(e){}peer=null;outbox=[];loadLocal();startHost();rerender()}
@@ -570,7 +597,7 @@ function renderLink(){var el=$('#link');
   else{var n=clientCount();el.className='link'+(n?' ok':'');
     el.innerHTML=peerReady?('Code téléphone <b>'+esc(myCode)+'</b>'+(n?' · '+n+' relié'+(n>1?'s':''):'')):esc(linkMsg||'Préparation de la liaison…')}
   var box=$('#s-conn');
-  if(mode==='remote')box.innerHTML='<div class="conn"><span class="muted">'+(remoteOk?'Relié à l\'ordinateur '+esc(remoteCode)+'. Copie complète sur ce téléphone : '+Object.keys(S.sessions).length+' séance'+(Object.keys(S.sessions).length>1?'s':'')+', '+Object.keys((S.classes&&S.classes.list)||{}).length+' classe(s).':esc(linkMsg))+'</span><button class="mini" id="s-unlink">Se déconnecter</button></div>';
+  if(mode==='remote')box.innerHTML='<div class="conn"><span class="muted">'+(remoteOk?'Relié à l\'ordinateur '+esc(remoteCode)+'. Copie sur ce téléphone : '+Object.keys(S.sets).length+' série(s), '+Object.keys(S.sessions).length+' séance(s), '+Object.keys((S.classes&&S.classes.list)||{}).length+' classe(s). '+(synced?'<b style="color:var(--good)">Synchronisé avec l\'ordinateur.</b>':'Synchronisation en cours…'):esc(linkMsg))+'</span><button class="mini" id="s-unlink">Se déconnecter</button></div>';
   else box.innerHTML='<div class="note conn"><span style="flex:1;min-width:180px">Sur le téléphone : tape le code affiché sur l\'ordinateur du projecteur.</span><input id="s-code" inputmode="numeric" maxlength="4" placeholder="0000" aria-label="Code de l\'ordinateur"><button class="btn" id="s-link">Relier</button></div>';
   var b=$('#s-link');if(b)b.onclick=function(){startRemote($('#s-code').value)};
   var u=$('#s-unlink');if(u)u.onclick=stopRemote;
