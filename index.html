@@ -155,7 +155,7 @@ tfoot td{font-weight:800;background:var(--bg)}
 <body>
 <div class="wrap">
   <header>
-    <h1>Cartes-réponses</h1><span class="muted" style="font-size:12px">version 10</span>
+    <h1>Cartes-réponses</h1><span class="muted" style="font-size:12px">version 11</span>
     <span class="link" id="link"></span>
     <nav class="tabs" role="tablist">
       <button role="tab" data-v="proj" aria-selected="true">Projeter</button>
@@ -470,10 +470,13 @@ function lsGetK(k){try{return localStorage.getItem(k)}catch(e){return null}}
 function lsSetK(k,v){try{if(v==null)localStorage.removeItem(k);else localStorage.setItem(k,v)}catch(e){}}
 function render(){renderProj();renderScan();renderSets();renderClass();renderRes();renderLink();try{renderFile()}catch(e){}}
 var rq=0;function rerender(){if(rq)return;rq=requestAnimationFrame(function(){rq=0;render()})}
-function delMark(kind,id){S.deleted=S.deleted||{};S.deleted[kind]=S.deleted[kind]||{};S.deleted[kind][id]=1}
+function delMark(kind,id,t){S.deleted=S.deleted||{};S.deleted[kind]=S.deleted[kind]||{};t=t||Date.now();if(!(S.deleted[kind][id]>=t))S.deleted[kind][id]=t}
+function delTime(kind,id){var d=S.deleted&&S.deleted[kind];return d&&d[id]?(d[id]===1||d[id]===true?1:+d[id]||1):0}
+/* un élément recréé après sa suppression (ts plus récent) n'est plus effacé */
+function isDead(kind,id,item){var t=delTime(kind,id);if(!t)return false;if(kind==='sessions')return true;return ((item&&item.ts)||0)<=t}
 function applyWrite(path,data){var p=path.split('/');
   if(path==='config/classes'&&data){var old=(S.classes&&S.classes.list)||{};for(var k in old)if(!data.list||!data.list[k])delMark('classes',k);S.classes=data}else if(p[0]==='config'&&data)S.classe=data;else if(p[0]==='live')S.live=data||{};
-  else if((p[0]==='sets'||p[0]==='sessions')&&p[1]){if(data==null){delete S[p[0]][p[1]];delMark(p[0],p[1])}else S[p[0]][p[1]]=data}}
+  else if((p[0]==='sets'||p[0]==='sessions')&&p[1]){if(data==null){delete S[p[0]][p[1]];delMark(p[0],p[1])}else{S[p[0]][p[1]]=data;if(S.deleted&&S.deleted[p[0]])delete S.deleted[p[0]][p[1]]}}}
 function noTs(o){var c=clone(o)||{};delete c.ts;return JSON.stringify(c)}
 function stampTs(path,data){if(!data)return;var p=path.split('/');
   if(p[0]==='sets'&&p[1])data.ts=Date.now();
@@ -535,7 +538,7 @@ function fp(o){var t=noTs(o),h=5381;for(var i=0;i<t.length;i++)h=((h<<5)+h+t.cha
 function manifest(){var m={sets:{},sessions:{},classes:S.classes,deleted:S.deleted||{}},k;
   for(k in S.sets)m.sets[k]={f:fp(S.sets[k]),ts:S.sets[k].ts||0};
   for(k in S.sessions)m.sessions[k]={n:sessAnsCount(S.sessions[k])};return m}
-function takeItem(kind,id,data,hostWins){if(!data)return false;if((S.deleted&&S.deleted[kind]&&S.deleted[kind][id]))return false;
+function takeItem(kind,id,data,hostWins){if(!data)return false;if(isDead(kind,id,data))return false;
   var o={};o[kind]={};o[kind][id]=data;var before=JSON.stringify(S[kind][id]||null);mergeData(o,hostWins);return JSON.stringify(S[kind][id]||null)!==before}
 function sendItems(dst,kind,ids){ids.forEach(function(id){if(S[kind][id])relaySend(dst,{t:'item',kind:kind,id:id,data:S[kind][id]})})}
 var gotN={sets:0,sessions:0},gotT=null;
@@ -560,7 +563,7 @@ function onHostData(src,m){if(!m||typeof m!=='object')return;
 function startRemote(code){
   code=String(code).replace(/\D/g,'');if(code.length!==4){toast('Le code a 4 chiffres.');return}
   if(code===myCode&&mode==='host'){toast('C\'est le code de cet appareil : tape-le sur le téléphone.');return}
-  mode='remote';remoteCode=code;lsSetK('cr-remote',code);remoteOk=false;lastState=0;
+  mode='remote';remoteCode=code;lsSetK('cr-remote',code);remoteOk=false;lastState=0;lastBoot=null;synced=false;
   if(peer){try{peer.destroy()}catch(e){}}peer=null;peerReady=false;clients={};
   S={classe:{name:'',students:{}},classes:{list:{},cur:null},sets:{},sessions:{},live:{},deleted:{}};
   try{var pd=localStorage.getItem('cr-phone-data');if(pd)mergeData(JSON.parse(pd))}catch(e){}
@@ -917,9 +920,10 @@ function writeFile(){if(!fileH)return Promise.resolve();var h=fileH;
     .then(function(){fileSaved=Date.now();fileErr='';renderFile()})
     .catch(function(e){fileErr='Enregistrement impossible ('+(e&&e.name||e)+'). Rouvre le fichier.';if(e&&e.name==='NotAllowedError')fileH=null;renderFile()})}
 function sessAnsCount(x){var n=0,a=(x&&x.answers)||{};for(var k in a)n+=Object.keys(a[k]||{}).length;return n}
-function purgeDeleted(){var D=S.deleted||{},k;for(k in (D.sessions||{}))delete S.sessions[k];for(k in (D.sets||{}))delete S.sets[k];
-  if(S.classes&&S.classes.list){for(k in (D.classes||{}))delete S.classes.list[k];if(S.classes.cur&&!S.classes.list[S.classes.cur])S.classes.cur=null}}
-function mergeDeleted(d){if(!d)return;['sessions','sets','classes'].forEach(function(t){for(var k in (d[t]||{}))delMark(t,k)})}
+function purgeDeleted(){var D=S.deleted||{},k;for(k in (D.sessions||{}))delete S.sessions[k];
+  for(k in (D.sets||{}))if(S.sets[k]&&isDead('sets',k,S.sets[k]))delete S.sets[k];
+  if(S.classes&&S.classes.list){for(k in (D.classes||{}))if(S.classes.list[k]&&isDead('classes',k,S.classes.list[k]))delete S.classes.list[k];if(S.classes.cur&&!S.classes.list[S.classes.cur])S.classes.cur=null}}
+function mergeDeleted(d){if(!d)return;['sessions','sets','classes'].forEach(function(t){for(var k in (d[t]||{})){var v=d[t][k];delMark(t,k,(v===true||v===1)?1:(+v||1))}})}
 function mergeData(v,hostWins){if(!v||typeof v!=='object')return;mergeDeleted(v.deleted);
   var c=v.classes&&v.classes.list?v.classes:{list:{},cur:null};S.classes=S.classes&&S.classes.list?S.classes:{list:{},cur:null};
   for(var k in c.list)if(newer(c.list[k],S.classes.list[k],hostWins))S.classes.list[k]=c.list[k];if(c.cur&&S.classes.list[c.cur])S.classes.cur=c.cur;
