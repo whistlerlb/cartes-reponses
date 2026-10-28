@@ -1,0 +1,18 @@
+{
+ "version": 1,
+ "niveaux": [
+  {
+   "id": "10e",
+   "nom": "10e",
+   "chapitres": [
+    {
+     "id": "10e-ch5-puissances-et-racines",
+     "num": 5,
+     "nom": "Puissances et racines",
+     "fichier": "quiz/10e/ch5-puissances-et-racines.dat",
+     "quiz": 9
+    }
+   ]
+  }
+ ]
+}
