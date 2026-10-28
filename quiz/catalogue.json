@@ -6,10 +6,10 @@
    "nom": "10e",
    "chapitres": [
     {
-     "id": "10e-ch5-puissances-et-racines",
-     "num": 5,
+     "id": "10e-ch3-puissances-et-racines",
+     "num": 3,
      "nom": "Puissances et racines",
-     "fichier": "quiz/10e/ch5-puissances-et-racines.dat",
+     "fichier": "quiz/10e/ch3-puissances-et-racines.dat",
      "quiz": 9
     }
    ]

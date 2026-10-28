@@ -25,13 +25,13 @@ pour les exposants, `[3/4]` pour une fraction superposée.
 ## Ajouter ou remplacer un chapitre
 
 ```bash
-python3 outils/ajouter_chapitre.py --niveau 10e --num 5 --nom "Puissances et racines" quiz.json
-git add quiz && git commit -m "Quiz : 10e ch. 5 Puissances et racines" && git push
+python3 outils/ajouter_chapitre.py --niveau 10e --num 3 --nom "Puissances et racines" quiz.json
+git add quiz && git commit -m "Quiz : 10e ch. 3 Puissances et racines" && git push
 ```
 
 Le script refuse un fichier qui ne respecte pas les règles. Relancer avec le même niveau,
 le même numéro et le même nom remplace le chapitre. Pour relire un fichier publié :
-`python3 outils/ajouter_chapitre.py --lire quiz/10e/ch5-puissances-et-racines.dat`.
+`python3 outils/ajouter_chapitre.py --lire quiz/10e/ch3-puissances-et-racines.dat`.
 
 Après le `git push`, GitHub Pages met environ une minute à publier.
 
