@@ -174,7 +174,7 @@ tfoot td{font-weight:800;background:var(--bg)}
 </div>
 <div class="wrap">
   <header>
-    <h1>Cartes-réponses</h1><span class="muted" style="font-size:12px">version 13</span>
+    <h1>Cartes-réponses</h1><span class="muted" style="font-size:12px">version 14</span>
     <span class="link" id="link"></span>
     <nav class="tabs" role="tablist">
       <button role="tab" data-v="proj" aria-selected="true">Projeter</button>
@@ -483,7 +483,8 @@ var CardDetector = (function () {
       else ans = ux < 0 ? 'B' : 'D';
       var prev = found[res.id];
       if (!prev || res.dist < prev.dist || (res.dist === prev.dist && qa > prev.area))
-        found[res.id] = { id: res.id, answer: ans, corners: Q, center: [cx, cy], dist: res.dist, area: qa, flat: flatness(Q) };
+        var ang = Math.abs(Math.atan2(uy, ux) * 180 / Math.PI) % 90, skew = Math.min(ang, 90 - ang);
+        found[res.id] = { id: res.id, answer: ans, corners: Q, center: [cx, cy], dist: res.dist, area: qa, flat: flatness(Q), skew: skew };
     });
     return Object.keys(found).map(function (k) { return found[k]; });
   }
@@ -821,7 +822,7 @@ function detectAsync(g,w,h){
   return new Promise(function(res){var k=++wid,t=setTimeout(function(){delete wcb[k];res([])},8000);
     wcb[k]=function(d){clearTimeout(t);res(d.err?[]:d.found)};worker.postMessage({k:k,g:g,w:w,h:h},[g.buffer])})}
 
-var cam={on:false,stream:null,busy:false,cand:{},key:null,lock:null,fps:0,lastT:0,maxSide:2560,dt:0,zoom:1};
+var cam={on:false,stream:null,busy:false,cand:{},key:null,lock:null,fps:0,lastT:0,maxSide:1600,dt:0,zoom:1};
 var FLAT=0.75;try{var fv=localStorage.getItem('cr-flat');if(fv!=null)FLAT=+fv}catch(e){}
 $('#s-flat').value=String(FLAT);if($('#s-flat').selectedIndex<0)$('#s-flat').value='0.75';
 $('#s-flat').onchange=function(){FLAT=+this.value;try{localStorage.setItem('cr-flat',this.value)}catch(e){}};
@@ -860,7 +861,7 @@ function loop(){if(!cam.on)return;
     var d=procCx.getImageData(0,0,w,h).data,g=new Uint8Array(w*h);for(var i=0,j=0;i<g.length;i++,j+=4)g[i]=(d[j]*77+d[j+1]*150+d[j+2]*29)>>8;
     var lq=liveQ();
     detectAsync(g,w,h).then(function(found){cam.busy=false;var dt=Date.now()-t0;cam.dt=cam.dt?cam.dt*0.7+dt*0.3:dt;
-      if(cam.dt>900&&cam.maxSide>1600){cam.maxSide=Math.max(1600,cam.maxSide-320);cam.dt=0}else if(cam.dt<350&&cam.maxSide<2560){cam.maxSide=Math.min(2560,cam.maxSide+320);cam.dt=0}
+      if(cam.dt>300&&cam.maxSide>960){cam.maxSide=Math.max(960,Math.round(cam.maxSide*0.85));cam.dt=0}else if(cam.dt<180&&cam.maxSide<2560){cam.maxSide=Math.min(2560,Math.round(cam.maxSide*1.12));cam.dt=0}
       if(cam.on&&lq&&cam.key===qkey())onFrame(found,w,h,lq)},function(){cam.busy=false});
   }
   requestAnimationFrame(loop)}
@@ -869,7 +870,8 @@ function onFrame(all,w,h,lq){
   var cards=all.filter(function(m){return m.id<NCARDS}),flats=cards.filter(function(m){return FLAT&&m.flat<FLAT}),found=cards.filter(function(m){return !(FLAT&&m.flat<FLAT)}),Q=lq.Q,ans=answersFor(lq.L,lq.i),map={},nNew=0;
   found.forEach(function(m){var n=m.id+1,c=cam.cand[n];
     if(c&&c.a===m.answer&&now-c.t<2500){c.c++;c.t=now}else c=cam.cand[n]={a:m.answer,c:1,t:now};
-    if(c.c>=2&&ans[n]!==m.answer){map[n]=m.answer;nNew++}});
+    var sure=c.c>=2||(m.dist===0&&m.skew<20);
+    if(sure&&ans[n]!==m.answer){map[n]=m.answer;nNew++}});
   if(nNew){saveAnswers(lq,map);try{if(navigator.vibrate)navigator.vibrate(25)}catch(e){}}
   // calque : cadres sur les cartes vues
   ov.width=w;ov.height=h;var o=ov.getContext('2d');o.clearRect(0,0,w,h);
@@ -884,7 +886,7 @@ function onFrame(all,w,h,lq){
     var fs=Math.max(14,w/60);o.font='700 '+fs+'px Nunito, sans-serif';var t=(m.id+1)+' à plat',tw=o.measureText(t).width,x=m.center[0]-tw/2-4,y=m.center[1]-fs/2-3;
     o.fillStyle='rgba(90,90,90,.85)';o.fillRect(x,y,tw+8,fs+6);o.fillStyle='#fff';o.fillText(t,x+4,y+fs)});
   var roster=named(),got=Object.keys(done).length,miss=roster.filter(function(n){return !done[n]});
-  $('#s-tag').textContent=found.length+' carte'+(found.length>1?'s':'')+' en vue'+(flats.length?' ('+flats.length+' à plat ignorée'+(flats.length>1?'s':'')+')':'')+' · '+got+(roster.length?' / '+roster.length:'')+' lues';
+  $('#s-tag').textContent=found.length+' carte'+(found.length>1?'s':'')+' en vue'+(flats.length?' ('+flats.length+' à plat ignorée'+(flats.length>1?'s':'')+')':'')+' · '+got+(roster.length?' / '+roster.length:'')+' lues · '+(cam.fps?cam.fps.toFixed(1).replace('.',','):'–')+' img/s';
   if(roster.length&&!miss.length){camStop();status('<b>Toute la classe est lue</b> ('+roster.length+' réponses). Tu peux révéler la réponse.');try{if(navigator.vibrate)navigator.vibrate([60,60,60])}catch(e){}return}
   status(roster.length?(miss.length<=12?'Pas encore lues : '+miss.map(function(n){return esc(nameOf(n))}).join(', ')+'.':miss.length+' élèves pas encore lus.'):got+' carte'+(got>1?'s':'')+' lue'+(got>1?'s':'')+'.');
 }
