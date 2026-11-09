@@ -125,6 +125,17 @@ sup{font-size:.62em;line-height:0;vertical-align:.75em}
 .cat .setItem{margin-top:8px}
 .prevQ{font-size:14px;line-height:1.4;padding:8px 10px;border-left:3px solid var(--line);margin:6px 0 0 4px}
 .prevQ .ok{color:var(--good);font-weight:800}
+th .qh{font:800 14px var(--fb);color:var(--accD);background:var(--accS);border:1.5px solid var(--acc);border-radius:8px;padding:3px 9px;cursor:pointer}
+th .qh:hover{background:var(--acc);color:#fff}
+td.lowpc{color:var(--bad);background:var(--badS)} td.midpc{color:var(--warn)}
+.qpop{position:fixed;z-index:70;background:var(--surf);color:var(--ink);border:1.5px solid var(--acc);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:12px 14px;display:flex;flex-direction:column;gap:7px;max-height:70vh;overflow:auto;white-space:normal;text-align:left}
+.qpop-h{display:flex;align-items:center;gap:8px}.qpop-h .muted{flex:1;font-size:13px}
+.qpop-q{font:600 18px var(--fd)}
+.qpop-c{display:grid;grid-template-columns:22px minmax(0,1fr) 70px 22px;align-items:center;gap:8px;font-size:15px;padding:3px 6px;border-radius:8px}
+.qpop-c .L{font:700 15px var(--fd);color:var(--ink2)}.qpop-c .N{text-align:right;font-weight:800;font-variant-numeric:tabular-nums}
+.qpop-c .bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden}.qpop-c .bar i{display:block;height:100%;background:var(--ink2)}
+.qpop-c.good{background:var(--goodS)}.qpop-c.good .L,.qpop-c.good .T{color:var(--good);font-weight:800}.qpop-c.good .bar i{background:var(--good)}
+.qpop-e{font-size:14px;color:var(--ink2);border-top:1px solid var(--line);padding-top:7px}
 /* ---- Questions ---- */
 .qcard{border:1.5px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;background:var(--bg)}
 .qhead{display:flex;align-items:center;gap:8px}
@@ -174,7 +185,7 @@ tfoot td{font-weight:800;background:var(--bg)}
 </div>
 <div class="wrap">
   <header>
-    <h1>Cartes-réponses</h1><span class="muted" style="font-size:12px">version 14</span>
+    <h1>Cartes-réponses</h1><span class="muted" style="font-size:12px">version 15</span>
     <span class="link" id="link"></span>
     <nav class="tabs" role="tablist">
       <button role="tab" data-v="proj" aria-selected="true">Projeter</button>
@@ -966,6 +977,24 @@ $('#c-add').onclick=function(){var c=clone(S.classes)||{list:{},cur:null};c.list
   setTimeout(function(){var n=$('#cn-'+id);if(n){n.focus();n.select()}},60)};
 
 /* ---------- RÉSULTATS ---------- */
+/* bulle de la question, dans l'onglet Résultats */
+var qpop=null,qpopT=0;
+function closeQPop(){if(qpop){qpop.remove();qpop=null}}
+function showQPop(btn,G,i){var same=qpop&&qpop.getAttribute('data-q')===String(i);closeQPop();if(same)return;
+  var Q=G.qs[i],cnt=[0,0,0,0],tot=0,ans=G.ans['q'+i]||{};for(var k in ans){var x=LET.indexOf(ans[k]);if(x>=0){cnt[x]++;tot++}}
+  var d=document.createElement('div');d.className='qpop';d.setAttribute('role','dialog');d.setAttribute('data-q',String(i));
+  d.innerHTML='<div class="qpop-h"><b>Question '+(i+1)+'</b><span class="muted">'+(tot?Math.round(cnt[Q.a]*100/tot)+' % de réussite · '+tot+' réponse'+(tot>1?'s':''):'aucune réponse')+'</span><button class="mini" aria-label="Fermer">✕</button></div>'+
+    '<div class="qpop-q">'+fmt(Q.q)+'</div>'+
+    Q.c.map(function(c,k){var pc=tot?Math.round(cnt[k]*100/tot):0;return '<div class="qpop-c'+(k===Q.a?' good':'')+'"><span class="L">'+LET[k]+'</span><span class="T">'+fmt(c)+'</span><span class="bar"><i style="width:'+pc+'%"></i></span><span class="N">'+cnt[k]+'</span></div>'}).join('')+
+    (Q.e?'<div class="qpop-e">'+fmt(Q.e)+'</div>':'');
+  document.body.appendChild(d);qpop=d;qpopT=Date.now();d.querySelector('button').onclick=closeQPop;
+  var r=btn.getBoundingClientRect(),w=Math.min(380,window.innerWidth-24);d.style.width=w+'px';
+  var left=Math.max(12,Math.min(window.innerWidth-w-12,r.left+r.width/2-w/2)),top=r.bottom+8;
+  if(top+d.offsetHeight>window.innerHeight-12)top=Math.max(12,r.top-d.offsetHeight-8);
+  d.style.left=left+'px';d.style.top=top+'px'}
+document.addEventListener('click',function(e){if(qpop&&!qpop.contains(e.target))closeQPop()});
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeQPop()});
+window.addEventListener('scroll',function(){if(qpop&&Date.now()-qpopT>400)closeQPop()},true);window.addEventListener('resize',closeQPop);
 var resConfirm=false,resPicked=false,resCount=-1;
 var resClass='',resClassPicked=false;
 function sessSorted(){return Object.keys(S.sessions).map(function(k){return {id:k,s:S.sessions[k]}}).filter(function(x){return !resClass||(resClass==='none'?!x.s.classId:x.s.classId===resClass)}).sort(function(a,b){return String(b.s.startedAt).localeCompare(String(a.s.startedAt))})}
@@ -988,12 +1017,13 @@ function renderRes(){
   var cf=$('#r-confirm');cf.hidden=!resConfirm||!x;
   if(!x){$('#r-tbl').innerHTML='';$('#r-sum').textContent='Lance une série pour voir les résultats ici.';}
   else{
-    var G=grid(x),h='<thead><tr><th class="l">Carte</th>'+G.qs.map(function(_,i){return '<th>Q'+(i+1)+'</th>'}).join('')+'<th>Score</th></tr></thead><tbody>',colOk=G.qs.map(function(){return 0}),colN=G.qs.map(function(){return 0});
+    var G=grid(x),h='<thead><tr><th class="l">Carte</th>'+G.qs.map(function(_,i){return '<th><button class="qh" data-q="'+i+'" title="Voir la question '+(i+1)+'">Q'+(i+1)+'</button></th>'}).join('')+'<th>Score</th></tr></thead><tbody>',colOk=G.qs.map(function(){return 0}),colN=G.qs.map(function(){return 0});
     G.nums.forEach(function(n){var ok=0;h+='<tr><td class="l">'+n+'</td>';
       G.qs.forEach(function(Q,i){var a=(G.ans['q'+i]||{})[n];if(!a){h+='<td class="na">–</td>';return}colN[i]++;var g=LET.indexOf(a)===Q.a;if(g){ok++;colOk[i]++}h+='<td class="'+(g?'ok':'ko')+'">'+a+'</td>'});
       h+='<td><b>'+ok+'</b> / '+G.qs.length+'</td></tr>'});
-    h+='</tbody><tfoot><tr><td class="l">Réussite</td>'+G.qs.map(function(_,i){return '<td>'+(colN[i]?Math.round(colOk[i]*100/colN[i])+' %':'–')+'</td>'}).join('')+'<td></td></tr></tfoot>';
+    h+='</tbody><tfoot><tr><td class="l">Réussite</td>'+G.qs.map(function(_,i){var pc=colN[i]?Math.round(colOk[i]*100/colN[i]):null;return '<td class="'+(pc==null?'':pc<50?'lowpc':pc<75?'midpc':'')+'">'+(pc==null?'–':pc+' %')+'</td>'}).join('')+'<td></td></tr></tfoot>';
     $('#r-tbl').innerHTML=h;
+    $$('#r-tbl .qh').forEach(function(b){b.onclick=function(e){e.stopPropagation();showQPop(b,G,+b.getAttribute('data-q'))}});
     $('#r-sum').innerHTML='Bonne réponse par question : '+G.qs.map(function(Q,i){return 'Q'+(i+1)+' '+LET[Q.a]}).join(' · ');
     cf.innerHTML='Supprimer définitivement la séance du '+esc(dstr(x.s.startedAt))+' ? <button class="mini" id="r-yes" style="color:var(--bad);border-color:var(--bad)">Oui, supprimer</button> <button class="mini" id="r-no">Annuler</button>';
     if(resConfirm){$('#r-yes').onclick=function(){delete S.sessions[x.id];if(S.live.sessionId===x.id)setLive({sessionId:null});delDoc('sessions/'+x.id);resConfirm=false;rerender();toast('Séance supprimée')};$('#r-no').onclick=function(){resConfirm=false;renderRes()}}
