@@ -11,6 +11,13 @@
      "nom": "Puissances et racines",
      "fichier": "quiz/10e/ch3-puissances-et-racines.dat",
      "quiz": 9
+    },
+    {
+     "id": "10e-ch4-lignes-surfaces-et-theoreme-de-pythagore",
+     "num": 4,
+     "nom": "Lignes, surfaces et théorème de Pythagore",
+     "fichier": "quiz/10e/ch4-lignes-surfaces-et-theoreme-de-pythagore.dat",
+     "quiz": 14
     }
    ]
   }
