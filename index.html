@@ -185,7 +185,7 @@ tfoot td{font-weight:800;background:var(--bg)}
 </div>
 <div class="wrap">
   <header>
-    <h1>Cartes-réponses</h1><span class="muted" style="font-size:12px">version 15</span>
+    <h1>Cartes-réponses</h1><span class="muted" style="font-size:12px">version 16</span>
     <span class="link" id="link"></span>
     <nav class="tabs" role="tablist">
       <button role="tab" data-v="proj" aria-selected="true">Projeter</button>
@@ -195,6 +195,7 @@ tfoot td{font-weight:800;background:var(--bg)}
       <button role="tab" data-v="res">Résultats</button>
     </nav>
   </header>
+  <div id="updBar" class="note fileBar" hidden></div>
   <div id="fileBar" class="note fileBar" hidden></div>
 
   <!-- PROJETER -->
@@ -1102,6 +1103,12 @@ function renderFile(){
 idbGet('file').then(function(h){storedH=h||null;renderFile()});
 
 loadCatalog();
+/* mise à jour : le navigateur garde parfois l'ancienne version en mémoire ; on vérifie et on propose de recharger */
+var APPV=16;
+function checkUpdate(){fetch('./?t='+Date.now(),{cache:'no-store'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/version (\d+)<\/span>/);var v=m?+m[1]:0;
+  if(v>APPV){var b=$('#updBar');b.hidden=false;b.innerHTML='<b>Une nouvelle version ('+v+') est disponible.</b><button class="btn solid" id="upd-go">Mettre à jour</button>';
+    $('#upd-go').onclick=function(){location.replace(location.pathname+'?v='+v+location.hash)}}}).catch(function(){})}
+checkUpdate();setInterval(checkUpdate,5*60*1000);
 var rc=lsGetK('cr-remote');
 if(rc){myCode=lsGetK('cr-code');startRemote(rc)}else{loadLocal();startHost()}
 render();
