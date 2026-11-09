@@ -40,3 +40,10 @@ Après le `git push`, GitHub Pages met environ une minute à publier.
 Le dépôt est public. Les réponses sont brouillées et l'application demande un code
 enseignant : c'est une dissuasion, pas un vrai chiffrement. Ne jamais mettre de prénoms
 ni de résultats d'élèves dans ce dépôt.
+
+## Nouvelle version de l'application
+
+À chaque modification de `index.html`, augmenter **les deux** numéros ensemble :
+le texte `version N</span>` à côté du titre et la constante `var APPV=N;`.
+Les navigateurs déjà ouverts comparent ces numéros avec la version en ligne et
+proposent « Mettre à jour » (ils gardent sinon l'ancienne page jusqu'à 10 minutes).
