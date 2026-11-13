@@ -65,7 +65,9 @@ sup{font-size:.62em;line-height:0;vertical-align:.75em}
 .s-q{font-family:var(--fd);font-weight:600;font-size:68px;line-height:1.05;text-align:center;margin:0;text-wrap:balance}
 .s-reg{display:flex;gap:8px;align-items:center;justify-content:center;background:#fff;border:3px solid var(--pPur);border-radius:16px;padding:6px 12px}
 .s-reg b{font-family:var(--fd);font-size:22px;color:var(--pPurD);margin-right:6px;white-space:nowrap}
-.s-reg i{font-style:normal;font-family:var(--fd);font-weight:700;font-size:28px;color:#2B2A33;background:var(--pPurS);border:2px solid var(--pPur);border-radius:10px;padding:2px 9px;min-width:46px;text-align:center}
+.s-reg i{font-style:normal;font-family:var(--fd);font-weight:700;font-size:26px;line-height:1.1;color:#2B2A33;background:var(--pPurS);border:2px solid var(--pPur);border-radius:10px;padding:2px 7px;min-width:46px;text-align:center;display:flex;flex-direction:column;align-items:center}
+.s-reg i small{font-size:13px;font-weight:700;color:#4A4858;font-family:var(--fb)}
+.s-reg i.hl{background:#FFCB2E;border-color:#B07F00;transform:scale(1.12)}
 .s-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;flex:1;min-height:0}
 .s-a{position:relative;display:flex;align-items:center;gap:20px;font-family:var(--fd);font-weight:600;font-size:46px;background:var(--pPurS);border:4px solid var(--pPur);border-radius:22px;padding:6px 26px;overflow:hidden}
 .s-a .L{font-size:38px;color:var(--pPurD);width:56px;height:56px;border-radius:50%;border:4px solid var(--pPur);background:#fff;display:flex;align-items:center;justify-content:center;flex:none;z-index:1}
@@ -188,7 +190,7 @@ tfoot td{font-weight:800;background:var(--bg)}
 </div>
 <div class="wrap">
   <header>
-    <h1>Cartes-réponses</h1><span class="muted" style="font-size:12px">version 17</span>
+    <h1>Cartes-réponses</h1><span class="muted" style="font-size:12px">version 18</span>
     <span class="link" id="link"></span>
     <nav class="tabs" role="tablist">
       <button role="tab" data-v="proj" aria-selected="true">Projeter</button>
@@ -751,7 +753,9 @@ show(['proj','scan','sets','class','res'].indexOf(hv)>=0?hv:(sv&&['proj','scan',
 function fit(){var box=$('#stageBox'),st=$('#stage');var fs=document.fullscreenElement===box;var W=box.clientWidth,H=box.clientHeight;if(!W)return;var k=fs?Math.min(W/1280,H/720):W/1280;st.style.transform='scale('+k+')';st.style.left=fs?((W-1280*k)/2)+'px':'0';st.style.top=fs?((H-720*k)/2)+'px':'0'}
 window.addEventListener('resize',fit);document.addEventListener('fullscreenchange',function(){setTimeout(fit,50)});
 /* réglette de carrés ou de cubes parfaits (champ r = 's' ou 'c' de la question) */
-function regHtml(r){if(r!=='s'&&r!=='c')return '';var v=r==='s'?[1,4,9,16,25,36,49,64,81,100,121,144,169]:[1,8,27,64,125,216,343,512,729,1000];return '<div class="s-reg"><b>'+(r==='s'?'Carrés parfaits':'Cubes parfaits')+'</b>'+v.map(function(x){return '<i>'+x+'</i>'}).join('')+'</div>'}
+function regHtml(r,n,rev){if(r!=='s'&&r!=='c')return '';var p=r==='s'?2:3,sy=r==='s'?'√':'∛',v=r==='s'?[1,4,9,16,25,36,49,64,81,100,121,144,169]:[1,8,27,64,125,216,343,512,729,1000],a=-1,b=-1;
+  if(rev&&n){var lo=1;while(Math.pow(lo+1,p)<=n)lo++;a=Math.pow(lo,p);b=Math.pow(lo+1,p)}
+  return '<div class="s-reg"><b>'+(r==='s'?'Carrés parfaits':'Cubes parfaits')+'</b>'+v.map(function(x,k){return '<i class="'+(x===a||x===b?'hl':'')+'">'+x+'<small>'+sy+x+' = '+(k+1)+'</small></i>'}).join('')+'</div>'}
 var projSeen={};
 function renderProj(){
   var pc=$('#p-class'),cls=classesSorted(),cc=curClass();pc.innerHTML=cls.map(function(x){return '<option value="'+esc(x.id)+'">'+esc(x.c.name)+' ('+x.c.count+' élèves)</option>'}).join('')||'<option value="">Aucune classe : ajoute-la dans l\'onglet Classe</option>';if(cc)pc.value=cc.id;
@@ -783,7 +787,7 @@ function renderProj(){
   if(projSeen[key])for(var n0 in ans)if(!seen[n0])fresh[n0]=1;
   projSeen={};projSeen[key]=Object.assign({},ans);
   var h='<div class="s-top"><span class="s-tag">'+esc(lq.L.s.title||'')+' · question '+(lq.i+1)+' / '+lq.qs.length+'</span><span class="s-hint">Lève ta carte : la bonne lettre en haut</span></div>';
-  h+='<div class="s-q">'+fmt(Q.q)+'</div>'+regHtml(Q.r)+'<div class="s-grid">';
+  h+='<div class="s-q">'+fmt(Q.q)+'</div>'+regHtml(Q.r,Q.n,rev)+'<div class="s-grid">';
   for(var i=0;i<4;i++){var cls='s-a'+(rev?(i===Q.a?' good':' dim'):'');var pc=tot?Math.round(cnt[i]*100/tot):0;
     h+='<div class="'+cls+'"><div class="bar" style="width:'+(rev?pc:0)+'%"></div><span class="L">'+LET[i]+'</span><span class="T">'+fmt(Q.c[i])+'</span>'+(rev?'<span class="N">'+cnt[i]+'</span>':'')+'</div>'}
   h+='</div><div class="s-foot"><div class="s-exp">'+(rev?fmt(Q.e||''):(tot?'Numéro en jaune : tu peux baisser ta carte.':''))+'</div><span class="s-count"><b>'+tot+'</b>'+(roster.length?' / '+roster.length:'')+' carte'+(tot>1?'s':'')+' lue'+(tot>1?'s':'')+'</span></div>';
@@ -1109,7 +1113,7 @@ idbGet('file').then(function(h){storedH=h||null;renderFile()});
 
 loadCatalog();
 /* mise à jour : le navigateur garde parfois l'ancienne version en mémoire ; on vérifie et on propose de recharger */
-var APPV=17;
+var APPV=18;
 function checkUpdate(){fetch('./?t='+Date.now(),{cache:'no-store'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/version (\d+)<\/span>/);var v=m?+m[1]:0;
   if(v>APPV){var b=$('#updBar');b.hidden=false;b.innerHTML='<b>Une nouvelle version ('+v+') est disponible.</b><button class="btn solid" id="upd-go">Mettre à jour</button>';
     $('#upd-go').onclick=function(){location.replace(location.pathname+'?v='+v+location.hash)}}}).catch(function(){})}
